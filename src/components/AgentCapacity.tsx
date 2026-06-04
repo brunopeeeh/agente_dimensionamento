@@ -1,0 +1,446 @@
+import { useMemo, useState } from "react";
+import { fmtNum } from "@/lib/sheets";
+import { RotateCcw, TrendingUp, Users, Headphones, Bot } from "lucide-react";
+import {
+  useDimensionamento,
+  DAYS,
+  Day,
+  TeamAgent,
+  matchAgentName,
+} from "@/context/DimensionamentoContext";
+
+const SHIFT_HOURS = 8;
+
+function deriveRow(mediaTri: number) {
+  const mediaMes = mediaTri / 3;
+  const resolvidosDia = Math.ceil(mediaMes / 20);
+  const resolvidosHora = resolvidosDia / SHIFT_HOURS;
+  const resolvidos20 = resolvidosHora / 3;
+  const resolvidos10 = resolvidosHora / 6;
+  return { mediaMes, resolvidosDia, resolvidosHora, resolvidos20, resolvidos10 };
+}
+
+const isScheduledOnDay = (agent: TeamAgent, day: Day) => {
+  if (!agent.active || !agent.schedules[day]) return false;
+  return Object.values(agent.schedules[day]!.intervals).some(
+    (s) => s === "trabalhando" || s === "externo" || s === "pausa",
+  );
+};
+
+export function AgentCapacity() {
+  const { capacityAgents, updateCapacityAgent, resetAll, teamAgents, tmaFactors } =
+    useDimensionamento();
+  const [selectedDay, setSelectedDay] = useState<Day | "Todos">("Todos");
+
+  const rows = capacityAgents.map((a) => ({ ...a, ...deriveRow(a.mediaTri) }));
+
+  const supportRow = rows.find((r) => r.name === "Yooga Suporte");
+  const aiRow = rows.find((r) => r.name === "Care AI");
+
+  // Dynamically map active team agents to capacity humanRows, defaulting mediaTri to 1500
+  const humanRows = useMemo(() => {
+    return teamAgents
+      .filter((agent) => agent.active)
+      .map((agent) => {
+        const capMatch = capacityAgents.find((ca) => matchAgentName(ca.name, agent.name));
+        const mediaTri = capMatch ? capMatch.mediaTri : 1500;
+        return {
+          name: agent.name,
+          mediaTri,
+          ...deriveRow(mediaTri),
+        };
+      });
+  }, [teamAgents, capacityAgents]);
+
+  const humanAgentsFiltered = useMemo(() => {
+    if (selectedDay === "Todos") {
+      return humanRows;
+    }
+    return humanRows.filter((row) => {
+      const match = teamAgents.find((agent) => agent.name === row.name);
+      if (!match) return false;
+      return isScheduledOnDay(match, selectedDay);
+    });
+  }, [humanRows, selectedDay, teamAgents]);
+
+  const totals = useMemo(() => {
+    const list = humanAgentsFiltered;
+    return {
+      mediaTri: list.reduce((s, r) => s + r.mediaTri, 0),
+      resolvidosDia: list.reduce((s, r) => s + r.resolvidosDia, 0),
+      resolvidosHora: list.reduce((s, r) => s + r.resolvidosHora, 0),
+      capacityWebchat: list.reduce((s, r) => s + r.resolvidos10, 0) / Math.max(list.length, 1),
+    };
+  }, [humanAgentsFiltered]);
+
+  // Dynamic KPIs calculations using selected day TMA factors
+  const tmaFactor = useMemo(() => {
+    if (selectedDay === "Todos") {
+      return Object.values(tmaFactors).reduce((s, f) => s + f, 0) / 7;
+    }
+    return tmaFactors[selectedDay];
+  }, [tmaFactors, selectedDay]);
+
+  // Total active human agents in the entire team roster (constant across days)
+  const totalTeamAgentsCount = useMemo(() => {
+    return teamAgents.filter((a) => a.active).length;
+  }, [teamAgents]);
+
+  // Divisor dynamically switches between total team count (for Visão Geral) and daily count (for specific days)
+  const currentDivisor = useMemo(() => {
+    if (selectedDay === "Todos") {
+      return totalTeamAgentsCount;
+    }
+    return humanAgentsFiltered.length;
+  }, [selectedDay, totalTeamAgentsCount, humanAgentsFiltered]);
+
+  const totalResolvidosHora = useMemo(() => {
+    const list = humanAgentsFiltered;
+    const humanSum = list.reduce((s, r) => s + r.resolvidosHora, 0);
+    const supportVal = supportRow ? Math.ceil(supportRow.mediaTri / 3 / 20) / SHIFT_HOURS : 0;
+    const aiVal = aiRow ? Math.ceil(aiRow.mediaTri / 3 / 20) / SHIFT_HOURS : 0;
+    return humanSum + supportVal + aiVal;
+  }, [humanAgentsFiltered, supportRow, aiRow]);
+
+  const currentCapacity = useMemo(() => {
+    const divisor = currentDivisor + 1; // total agents + 1 (Yooga Tecnologia/Suporte)
+    return totalResolvidosHora / Math.max(divisor, 1);
+  }, [totalResolvidosHora, currentDivisor]);
+
+  const currentCapacityTag = useMemo(() => {
+    const divisor = currentDivisor + 2; // total agents + Yooga Tecnologia (1) + Care AI (1)
+    return totalResolvidosHora / Math.max(divisor, 1);
+  }, [totalResolvidosHora, currentDivisor]);
+
+  const totalResolvidos20 = useMemo(() => {
+    const list = humanAgentsFiltered;
+    const humanSum = list.reduce((s, r) => s + r.resolvidos20, 0);
+    const supportVal = supportRow ? Math.ceil(supportRow.mediaTri / 3 / 20) / SHIFT_HOURS / 3 : 0;
+    const aiVal = aiRow ? Math.ceil(aiRow.mediaTri / 3 / 20) / SHIFT_HOURS / 3 : 0;
+    return humanSum + supportVal + aiVal;
+  }, [humanAgentsFiltered, supportRow, aiRow]);
+
+  const currentCapacity20min = useMemo(() => {
+    const divisor = currentDivisor + 1; // total agents + 1 (Yooga Tecnologia/Suporte)
+    return totalResolvidos20 / Math.max(divisor, 1);
+  }, [totalResolvidos20, currentDivisor]);
+
+  const totalResolvidos10 = useMemo(() => {
+    const list = humanAgentsFiltered;
+    const humanSum = list.reduce((s, r) => s + r.resolvidos10, 0);
+    const supportVal = supportRow ? Math.ceil(supportRow.mediaTri / 3 / 20) / SHIFT_HOURS / 6 : 0;
+    const aiVal = aiRow ? Math.ceil(aiRow.mediaTri / 3 / 20) / SHIFT_HOURS / 6 : 0;
+    return humanSum + supportVal + aiVal;
+  }, [humanAgentsFiltered, supportRow, aiRow]);
+
+  const currentCapacityWebchat = useMemo(() => {
+    const divisor = currentDivisor + 1; // total agents + 1 (Yooga Tecnologia/Suporte)
+    return totalResolvidos10 / Math.max(divisor, 1);
+  }, [totalResolvidos10, currentDivisor]);
+
+  const currentCapacityWhats = useMemo(() => {
+    return (currentCapacityWebchat * 4) / 3;
+  }, [currentCapacityWebchat]);
+
+  return (
+    <div className="space-y-6">
+      {/* Premium themed operational cards grid */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {/* Card 1: Equipe Care */}
+        <div className="rounded-xl border bg-card p-5 shadow-sm flex items-center gap-4 transition-all duration-300 hover:scale-[1.01] hover:shadow-md border-border">
+          <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <Users className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="text-xs text-muted-foreground font-medium">Equipe Care</span>
+            <div className="text-3xl font-bold tracking-tight mt-0.5 text-foreground">
+              {humanAgentsFiltered.length}
+            </div>
+            <span className="text-[10px] text-muted-foreground font-medium lowercase">
+              agentes ativos
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Yooga Suporte */}
+        <div className="rounded-xl border bg-card p-5 shadow-sm flex items-center gap-4 transition-all duration-300 hover:scale-[1.01] hover:shadow-md border-border">
+          <div className="p-3 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+            <Headphones className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="text-xs text-muted-foreground font-medium">Yooga Suporte</span>
+            <div className="text-3xl font-bold tracking-tight mt-0.5 text-foreground">
+              {supportRow ? Math.ceil(supportRow.mediaTri / 3 / 20) : 61}
+            </div>
+            <span className="text-[10px] text-muted-foreground font-medium lowercase">
+              resolvidos/dia
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Care AI */}
+        <div className="rounded-xl border bg-card p-5 shadow-sm flex items-center gap-4 transition-all duration-300 hover:scale-[1.01] hover:shadow-md border-border">
+          <div className="p-3 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+            <Bot className="h-6 w-6" />
+          </div>
+          <div>
+            <span className="text-xs text-muted-foreground font-medium">Care AI</span>
+            <div className="text-3xl font-bold tracking-tight mt-0.5 text-foreground">
+              {aiRow ? Math.ceil(aiRow.mediaTri / 3 / 20) : 245}
+            </div>
+            <span className="text-[10px] text-muted-foreground font-medium lowercase">
+              resolvidos/dia
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Métricas de Capacidade Premium Card */}
+      <div className="rounded-xl border bg-card p-5 shadow-sm border-border">
+        <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-emerald-500" />
+          Métricas de Capacidade
+        </h3>
+        <div
+          className={`grid gap-3 ${selectedDay === "Todos" ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2"}`}
+        >
+          {selectedDay === "Todos" && (
+            <>
+              {/* Capsule 1: Capacity */}
+              <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                  Capacity
+                </span>
+                <div className="text-xl font-bold text-foreground mt-1 font-mono tracking-tight">
+                  {fmtNum(currentCapacity, 2)}
+                </div>
+              </div>
+              {/* Capsule 2: Capacity/Tag */}
+              <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                  Capacity/Tag
+                </span>
+                <div className="text-xl font-bold text-foreground mt-1 font-mono tracking-tight">
+                  {fmtNum(currentCapacityTag, 2)}
+                </div>
+              </div>
+              {/* Capsule 3: Capacity/20min */}
+              <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                  Capacity/20min
+                </span>
+                <div className="text-xl font-bold text-foreground mt-1 font-mono tracking-tight">
+                  {fmtNum(currentCapacity20min, 2)}
+                </div>
+              </div>
+            </>
+          )}
+          {/* Capsule 4: Capacity/Webchat */}
+          <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
+            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+              Capacity/Webchat
+            </span>
+            <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono tracking-tight">
+              {fmtNum(currentCapacityWebchat, 2)}
+            </div>
+          </div>
+          {/* Capsule 5: Capacity/Whats */}
+          <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
+            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+              Capacity/Whats
+            </span>
+            <div className="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1 font-mono tracking-tight">
+              {fmtNum(currentCapacityWhats, 2)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-col gap-4 border-b px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold">Capacity por Agente</h2>
+              <p className="text-xs text-muted-foreground">
+                Edite o volume trimestral (os demais valores são recalculados automaticamente).
+              </p>
+            </div>
+            <button
+              onClick={resetAll}
+              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <RotateCcw className="h-3 w-3" /> Restaurar valores
+            </button>
+          </div>
+
+          {/* Day of the week Selector Pills */}
+          <div className="flex flex-wrap gap-1 border-t border-border/40 pt-3.5 select-none">
+            <button
+              type="button"
+              onClick={() => setSelectedDay("Todos")}
+              className={`px-3 py-1 text-xs font-semibold border transition-all ${
+                selectedDay === "Todos"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              Visão Geral
+            </button>
+            {DAYS.map((day) => (
+              <button
+                key={day}
+                type="button"
+                onClick={() => setSelectedDay(day)}
+                className={`px-3 py-1 text-xs font-semibold border transition-all ${
+                  selectedDay === day
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                }`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <Th>Team Member {selectedDay !== "Todos" && selectedDay}</Th>
+                <Th right>Média / Tri</Th>
+                <Th right>Média / Mês</Th>
+                <Th right>Resolv / Dia</Th>
+                <Th right>Resolv / Hora</Th>
+                <Th right>/ 20min</Th>
+                <Th right>/ 10min</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {humanAgentsFiltered.map((r) => (
+                <tr key={r.name} className="border-b hover:bg-accent/30">
+                  <td className="px-4 py-2.5 font-medium">{r.name}</td>
+                  <td className="px-4 py-2 text-right">
+                    <input
+                      type="number"
+                      value={r.mediaTri}
+                      onChange={(e) => {
+                        const v = Number(e.target.value) || 0;
+                        updateCapacityAgent(r.name, v);
+                      }}
+                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold"
+                    />
+                  </td>
+                  <Td>{fmtNum(r.mediaMes, 1)}</Td>
+                  <Td bold>{r.resolvidosDia}</Td>
+                  <Td>{fmtNum(r.resolvidosHora, 3)}</Td>
+                  <Td>{fmtNum(r.resolvidos20, 3)}</Td>
+                  <Td>{fmtNum(r.resolvidos10, 3)}</Td>
+                </tr>
+              ))}
+
+              {/* Blank separator row to divide active agents from Yooga Suporte and Care AI */}
+              {humanAgentsFiltered.length > 0 && (
+                <tr className="h-6 bg-muted/5 border-b border-border/10">
+                  <td colSpan={7} className="p-0"></td>
+                </tr>
+              )}
+
+              {/* Static Average and AI Rows */}
+              {supportRow && (
+                <tr className="border-b bg-muted/10 font-medium">
+                  <td className="px-4 py-2.5 text-muted-foreground">{supportRow.name}</td>
+                  <td className="px-4 py-2 text-right">
+                    <input
+                      type="number"
+                      value={supportRow.mediaTri}
+                      onChange={(e) => {
+                        const v = Number(e.target.value) || 0;
+                        updateCapacityAgent(supportRow.name, v);
+                      }}
+                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold"
+                    />
+                  </td>
+                  <Td>{fmtNum(supportRow.mediaMes, 1)}</Td>
+                  <Td bold>{supportRow.resolvidosDia}</Td>
+                  <Td>{fmtNum(supportRow.resolvidosHora, 3)}</Td>
+                  <Td>{fmtNum(supportRow.resolvidos20, 3)}</Td>
+                  <Td>{fmtNum(supportRow.resolvidos10, 3)}</Td>
+                </tr>
+              )}
+              {aiRow && (
+                <tr className="border-b last:border-0 bg-muted/20 font-semibold">
+                  <td className="px-4 py-2.5 text-foreground">{aiRow.name}</td>
+                  <td className="px-4 py-2 text-right">
+                    <input
+                      type="number"
+                      value={aiRow.mediaTri}
+                      onChange={(e) => {
+                        const v = Number(e.target.value) || 0;
+                        updateCapacityAgent(aiRow.name, v);
+                      }}
+                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold"
+                    />
+                  </td>
+                  <Td>{fmtNum(aiRow.mediaMes, 1)}</Td>
+                  <Td bold>{aiRow.resolvidosDia}</Td>
+                  <Td>{fmtNum(aiRow.resolvidosHora, 3)}</Td>
+                  <Td>{fmtNum(aiRow.resolvidos20, 3)}</Td>
+                  <Td>{fmtNum(aiRow.resolvidos10, 3)}</Td>
+                </tr>
+              )}
+            </tbody>
+            {selectedDay === "Todos" && (
+              <tfoot>
+                <tr className="bg-muted/60 font-semibold border-t">
+                  <td className="px-4 py-2.5">Total (humanos)</td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {fmtNum(totals.mediaTri, 0)}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {fmtNum(totals.mediaTri / 3, 1)}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">{totals.resolvidosDia}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {fmtNum(totals.resolvidosHora, 2)}
+                  </td>
+                  <td />
+                  <td />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+        <TrendingUp className={`h-4 w-4 ${accent ? "text-primary" : "text-muted-foreground"}`} />
+      </div>
+      <div className={`mt-2 text-2xl font-semibold tabular-nums ${accent ? "text-primary" : ""}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
+  return <th className={`px-4 py-2.5 font-medium ${right ? "text-right" : ""}`}>{children}</th>;
+}
+function Td({ children, bold }: { children: React.ReactNode; bold?: boolean }) {
+  return (
+    <td
+      className={`px-4 py-2 text-right tabular-nums ${bold ? "font-semibold" : "text-muted-foreground"}`}
+    >
+      {children}
+    </td>
+  );
+}

@@ -1,0 +1,2382 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.freshchat.com/v2/agents?page=1&items_per_page=100",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-45872, 18080],
+      "id": "93a5ba1d-1e73-4243-ade4-9be24623714e",
+      "name": "request-agents1",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "8Y7SUaaDlG2llQNl",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8452a51e-6699-49be-a6dc-34606f85641f",
+              "name": "fisrt_name",
+              "value": "={{ $json.first_name }} ",
+              "type": "string"
+            },
+            {
+              "id": "5d3b12a6-5705-4579-b6bb-7e074df8539f",
+              "name": "last_name",
+              "value": "={{ $json.last_name }} ",
+              "type": "string"
+            },
+            {
+              "id": "33fa8a88-98ae-42df-83bf-ac77fb20b9e1",
+              "name": "agent_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "9cd91172-515c-44a9-a469-273ab73c6779",
+              "name": "groups_ids",
+              "value": "={{ $json.groups }}",
+              "type": "array"
+            },
+            {
+              "id": "a7780201-92a9-4d49-b5bb-022904e4a0a5",
+              "name": "availability_status",
+              "value": "={{ $json.availability_status }}",
+              "type": "string"
+            },
+            {
+              "id": "bd71f2f3-a3bc-4c69-a4a2-42211c6c9625",
+              "name": "skill_id",
+              "value": "={{ $json.skill_id }}",
+              "type": "string"
+            },
+            {
+              "id": "9f50cb5b-f191-43e0-9749-585081c6a7ba",
+              "name": "agent_name",
+              "value": "={{ $json.first_name }} {{ $json.last_name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-45424, 18080],
+      "id": "0f4dd570-1b78-42ef-8b49-12af7bc41503",
+      "name": "Norm. Dados necessários1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Código para n8n - Filtrar usuários por grupos específicos\n// Regra: (RETENTION OU WEBCHAT) MENOS ONBOARDING\n\n// IDs dos grupos que queremos filtrar\nconst retention_group_id = \"3ea40078-55f2-4176-85ee-face7f3d7498\";\nconst webchat_group_id = \"6b748002-634a-4ba7-b191-844d123643ed\";\nconst onboarding_group_id = \"64f40e5f-b18a-4d1d-8c23-1fcb9575c5a7\";\n\n// Recebe o input do n8n\nconst inputData = $input.all();\n\n// Função para verificar se um agente pertence ao grupo de retention ou webchat\nfunction belongsToRetentionOrWebchat(userGroups) {\n  if (!userGroups || !Array.isArray(userGroups)) {\n    return false;\n  }\n  return userGroups.includes(retention_group_id) || userGroups.includes(webchat_group_id);\n}\n\n// Função para verificar se um agente pertence ao grupo de onboarding\nfunction belongsToOnboarding(userGroups) {\n  if (!userGroups || !Array.isArray(userGroups)) {\n    return false;\n  }\n  return userGroups.includes(onboarding_group_id);\n}\n\n// Filtra os usuários aplicando a regra: (RETENTION OU WEBCHAT) - ONBOARDING\nconst filteredUsers = [];\n\n// Itera sobre cada item do input\nfor (const item of inputData) {\n  // Verifica se existe o array de agents\n  if (item.json && item.json.agents) {\n    const agents = item.json.agents;\n    \n    // Aplica a regra de filtro: pertence a retention OU webchat, MAS NÃO pertence a onboarding\n    const matchingAgents = agents.filter(agent => {\n      const inRetentionOrWebchat = belongsToRetentionOrWebchat(agent.groups);\n      const inOnboarding = belongsToOnboarding(agent.groups);\n      \n      // Retorna true se está em retention/webchat E NÃO está em onboarding\n      return inRetentionOrWebchat && !inOnboarding;\n    });\n    \n    // Adiciona os usuários filtrados ao resultado\n    matchingAgents.forEach(agent => {\n      filteredUsers.push({\n        json: agent\n      });\n    });\n  }\n}\n\n// Retorna os usuários filtrados\nreturn filteredUsers;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-45648, 18080],
+      "id": "d1242738-9bb3-423b-b249-a9c3a2a92aac",
+      "name": "Filtrar apenas agentes do suporte1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "22178e20-836b-415c-a4ad-c00dbde03cbe",
+              "name": "start_date",
+              "value": "={{ $now.minus({days: 90}).endOf('day').format('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "id": "6ba25939-ee53-421f-a8de-ea493b230e2d",
+              "name": "end_date",
+              "value": "={{ $now.format('yyyy-MM-dd')}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-45424, 17904],
+      "id": "030de2f0-d9b8-46f1-a12a-63d5c0cfffc9",
+      "name": "Config_Dates4"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-45152, 17920],
+      "id": "217fce94-cf3e-4805-b5bf-71473d024b4b",
+      "name": "Merge16"
+    },
+    {
+      "parameters": {
+        "url": "https://api.freshchat.com/v2/metrics/historical",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "metric",
+              "value": "conversation_metrics.resolved_interactions"
+            },
+            {
+              "name": "start",
+              "value": "={{ $json.start_date }}"
+            },
+            {
+              "name": "end",
+              "value": "={{ $json.end_date }}"
+            },
+            {
+              "name": "count_metric",
+              "value": "count"
+            },
+            {
+              "name": "filter_by",
+              "value": "=agent={{ $json.agent_id }}"
+            },
+            {
+              "name": "group_by",
+              "value": "=agent"
+            },
+            {
+              "name": "interval",
+              "value": "1d"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-44800, 17600],
+      "id": "363cef1d-04ef-499b-8c6b-5d28db7a2b75",
+      "name": "request_agent_conversation_count",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "8Y7SUaaDlG2llQNl",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "filters.metric_filters[0].value",
+              "field2": "agent_id"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44816, 17904],
+      "id": "54a514cd-d7ac-46ff-a3fc-6708b8638f07",
+      "name": "Merge17"
+    },
+    {
+      "parameters": {
+        "content": "## Capacity dos agentes + Numero de chamados por agentes"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-45808, 17632],
+      "typeVersion": 1,
+      "id": "bd141e35-6eed-4f94-bccd-bc4e5e30c740",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-45472, 17248],
+      "id": "39ba0830-c260-4a87-ab58-7c2326583aea",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Prepara a lista de agentes (unificando dados reais e mocados)\nconst agentsData = items.map(item => ({\n  name: item.json.agent_name,\n  total_90_days: item.json.total,\n  isHuman: true \n}));\n\n// Injetando dados mocados conforme solicitado\nagentsData.push({ name: \"Yooga Suporte\", total_90_days: 3634, isHuman: true });\nagentsData.push({ name: \"Care AI\", total_90_days: 14696, isHuman: false });\n\nlet totalTenMinCapacity = 0;\nlet humanAgentCount = 0;\nlet detailedResults = [];\n\n// 2. Realiza os cálculos de base para cada entidade\nagentsData.forEach(agent => {\n  const total = agent.total_90_days;\n  \n  // Lógica de médias sucessivas\n  const mediaMensal = total / 3;\n  const mediaDiaria = Math.ceil(mediaMensal / 20); // Arredonda para cima conforme regra\n  const mediaHora = mediaDiaria / 8;\n  const media10Min = mediaHora / 6;\n\n  // Acumula a capacidade para o cálculo do time\n  totalTenMinCapacity += media10Min;\n\n  // Conta apenas humanos para o divisor final\n  if (agent.isHuman) {\n    humanAgentCount++;\n  }\n\n  detailedResults.push({\n    agente: agent.name,\n    total_trimestral: total,\n    media_10_min: parseFloat(media10Min.toFixed(4)),\n    tipo: agent.isHuman ? \"Humano\" : \"IA\"\n  });\n});\n\n// 3. Cálculos Finais de Capacidade (Webchat e WhatsApp)\n\n// Capacity Webchat: Soma das médias / quantidade de humanos\nconst capacity_webchat = humanAgentCount > 0 ? (totalTenMinCapacity / humanAgentCount) : 0;\n\n// Capacity WhatsApp: (Capacity Webchat * 4) / 3\nconst capacity_whatsapp = (capacity_webchat * 4) / 3;\n\n// Retorno estruturado\nreturn [{\n  json: {\n    capacity_webchat: parseFloat(capacity_webchat.toFixed(4)),\n    capacity_whatsapp: parseFloat(capacity_whatsapp.toFixed(4)),\n    total_agentes_humanos: humanAgentCount,\n    total_entidades_processadas: agentsData.length,\n    detalhes_por_agente: detailedResults\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43712, 17744],
+      "id": "6b9af5f1-5031-4cb8-bb3e-b988ac640d4a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// O n8n recebe os dados em um array chamado 'items'\nreturn items.map(item => {\n  let totalSum = 0;\n\n  // 1. Acessa o array 'data'\n  if (item.json.data && Array.isArray(item.json.data)) {\n    item.json.data.forEach(dataEntry => {\n      \n      // 2. Acessa o array 'series' dentro de cada dataEntry\n      if (dataEntry.series && Array.isArray(dataEntry.series)) {\n        dataEntry.series.forEach(serie => {\n          \n          // 3. Acessa o array 'values' dentro de cada serie\n          if (serie.values && Array.isArray(serie.values)) {\n            serie.values.forEach(valObj => {\n              \n              // 4. Converte a string \"16.0\" para número e soma\n              const numericValue = parseFloat(valObj.value) || 0;\n              totalSum += numericValue;\n            });\n          }\n        });\n      }\n    });\n  }\n\n  // Retorna o novo formato desejado\n  return {\n    json: {\n      agent_name: item.json.agent_name.trim(),\n      total: totalSum\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43936, 17744],
+      "id": "24803320-6fd7-4f97-a541-9364df73fdc0",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0",
+          "mode": "list",
+          "cachedResultName": "Cópia de Escala e Previsão - Maio/2026",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 693374534,
+          "mode": "list",
+          "cachedResultName": "QUERY - agentes_dia",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0/edit#gid=693374534"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-44832, 18848],
+      "id": "4452ac3d-6107-4c35-8034-92f82d40b278",
+      "name": "Escala Pretendida",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "Segunda-Feira",
+              "field2": "agent_name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44112, 17408],
+      "id": "c6a8b358-80f0-457e-a753-5eee858573b7",
+      "name": "Segunda"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Prepara a lista de agentes (unificando dados reais e mocados)\nconst agentsData = items.map(item => ({\n  name: item.json.agent_name,\n  total_90_days: item.json.total,\n  isHuman: true \n}));\n\n// Injetando dados mocados conforme solicitado\nagentsData.push({ name: \"Yooga Suporte\", total_90_days: 3634, isHuman: true });\nagentsData.push({ name: \"Care AI\", total_90_days: 14696, isHuman: false });\n\nlet totalTenMinCapacity = 0;\nlet humanAgentCount = 0;\nlet detailedResults = [];\n\n// 2. Realiza os cálculos de base para cada entidade\nagentsData.forEach(agent => {\n  const total = agent.total_90_days;\n  \n  // Lógica de médias sucessivas\n  const mediaMensal = total / 3;\n  const mediaDiaria = Math.ceil(mediaMensal / 20); // Arredonda para cima conforme regra\n  const mediaHora = mediaDiaria / 8;\n  const media10Min = mediaHora / 6;\n\n  // Acumula a capacidade para o cálculo do time\n  totalTenMinCapacity += media10Min;\n\n  // Conta apenas humanos para o divisor final\n  if (agent.isHuman) {\n    humanAgentCount++;\n  }\n\n  detailedResults.push({\n    agente: agent.name,\n    total_trimestral: total,\n    media_10_min: parseFloat(media10Min.toFixed(4)),\n    tipo: agent.isHuman ? \"Humano\" : \"IA\"\n  });\n});\n\n// 3. Cálculos Finais de Capacidade (Webchat e WhatsApp)\n\n// Capacity Webchat: Soma das médias / quantidade de humanos\nconst capacity_webchat = humanAgentCount > 0 ? (totalTenMinCapacity / humanAgentCount) : 0;\n\n// Capacity WhatsApp: (Capacity Webchat * 4) / 3\nconst capacity_whatsapp = (capacity_webchat * 4) / 3;\n\n// Retorno estruturado\nreturn [{\n  json: {\n    capacity_webchat: parseFloat(capacity_webchat.toFixed(4)),\n    capacity_whatsapp: parseFloat(capacity_whatsapp.toFixed(4)),\n    total_agentes_humanos: humanAgentCount,\n    total_entidades_processadas: agentsData.length,\n    detalhes_por_agente: detailedResults\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43712, 17408],
+      "id": "856a10ca-aa74-4119-a23e-65f13f4c7201",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// O n8n recebe os dados em um array chamado 'items'\nreturn items.map(item => {\n  let totalSum = 0;\n\n  // 1. Acessa o array 'data'\n  if (item.json.data && Array.isArray(item.json.data)) {\n    item.json.data.forEach(dataEntry => {\n      \n      // 2. Acessa o array 'series' dentro de cada dataEntry\n      if (dataEntry.series && Array.isArray(dataEntry.series)) {\n        dataEntry.series.forEach(serie => {\n          \n          // 3. Acessa o array 'values' dentro de cada serie\n          if (serie.values && Array.isArray(serie.values)) {\n            serie.values.forEach(valObj => {\n              \n              // 4. Converte a string \"16.0\" para número e soma\n              const numericValue = parseFloat(valObj.value) || 0;\n              totalSum += numericValue;\n            });\n          }\n        });\n      }\n    });\n  }\n\n  // Retorna o novo formato desejado\n  return {\n    json: {\n      agent_name: item.json.agent_name.trim(),\n      total: totalSum\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43920, 17408],
+      "id": "2407adf6-72ae-402d-b962-774e2f120657",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Prepara a lista de agentes (unificando dados reais e mocados)\nconst agentsData = items.map(item => ({\n  name: item.json.agent_name,\n  total_90_days: item.json.total,\n  isHuman: true \n}));\n\n// Injetando dados mocados conforme solicitado\nagentsData.push({ name: \"Yooga Suporte\", total_90_days: 3634, isHuman: true });\nagentsData.push({ name: \"Care AI\", total_90_days: 14696, isHuman: false });\n\nlet totalTenMinCapacity = 0;\nlet humanAgentCount = 0;\nlet detailedResults = [];\n\n// 2. Realiza os cálculos de base para cada entidade\nagentsData.forEach(agent => {\n  const total = agent.total_90_days;\n  \n  // Lógica de médias sucessivas\n  const mediaMensal = total / 3;\n  const mediaDiaria = Math.ceil(mediaMensal / 20); // Arredonda para cima conforme regra\n  const mediaHora = mediaDiaria / 8;\n  const media10Min = mediaHora / 6;\n\n  // Acumula a capacidade para o cálculo do time\n  totalTenMinCapacity += media10Min;\n\n  // Conta apenas humanos para o divisor final\n  if (agent.isHuman) {\n    humanAgentCount++;\n  }\n\n  detailedResults.push({\n    agente: agent.name,\n    total_trimestral: total,\n    media_10_min: parseFloat(media10Min.toFixed(4)),\n    tipo: agent.isHuman ? \"Humano\" : \"IA\"\n  });\n});\n\n// 3. Cálculos Finais de Capacidade (Webchat e WhatsApp)\n\n// Capacity Webchat: Soma das médias / quantidade de humanos\nconst capacity_webchat = humanAgentCount > 0 ? (totalTenMinCapacity / humanAgentCount) : 0;\n\n// Capacity WhatsApp: (Capacity Webchat * 4) / 3\nconst capacity_whatsapp = (capacity_webchat * 4) / 3;\n\n// Retorno estruturado\nreturn [{\n  json: {\n    capacity_webchat: parseFloat(capacity_webchat.toFixed(4)),\n    capacity_whatsapp: parseFloat(capacity_whatsapp.toFixed(4)),\n    total_agentes_humanos: humanAgentCount,\n    total_entidades_processadas: agentsData.length,\n    detalhes_por_agente: detailedResults\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43712, 17568],
+      "id": "62d69d58-c763-4abb-80e2-0d85edd36ec4",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// O n8n recebe os dados em um array chamado 'items'\nreturn items.map(item => {\n  let totalSum = 0;\n\n  // 1. Acessa o array 'data'\n  if (item.json.data && Array.isArray(item.json.data)) {\n    item.json.data.forEach(dataEntry => {\n      \n      // 2. Acessa o array 'series' dentro de cada dataEntry\n      if (dataEntry.series && Array.isArray(dataEntry.series)) {\n        dataEntry.series.forEach(serie => {\n          \n          // 3. Acessa o array 'values' dentro de cada serie\n          if (serie.values && Array.isArray(serie.values)) {\n            serie.values.forEach(valObj => {\n              \n              // 4. Converte a string \"16.0\" para número e soma\n              const numericValue = parseFloat(valObj.value) || 0;\n              totalSum += numericValue;\n            });\n          }\n        });\n      }\n    });\n  }\n\n  // Retorna o novo formato desejado\n  return {\n    json: {\n      agent_name: item.json.agent_name.trim(),\n      total: totalSum\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43936, 17568],
+      "id": "34f0af73-8c5e-4cb5-8d48-d6f96ce1b2e1",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "jsCode": "// O n8n recebe os dados em um array chamado 'items'\nreturn items.map(item => {\n  let totalSum = 0;\n\n  // 1. Acessa o array 'data'\n  if (item.json.data && Array.isArray(item.json.data)) {\n    item.json.data.forEach(dataEntry => {\n      \n      // 2. Acessa o array 'series' dentro de cada dataEntry\n      if (dataEntry.series && Array.isArray(dataEntry.series)) {\n        dataEntry.series.forEach(serie => {\n          \n          // 3. Acessa o array 'values' dentro de cada serie\n          if (serie.values && Array.isArray(serie.values)) {\n            serie.values.forEach(valObj => {\n              \n              // 4. Converte a string \"16.0\" para número e soma\n              const numericValue = parseFloat(valObj.value) || 0;\n              totalSum += numericValue;\n            });\n          }\n        });\n      }\n    });\n  }\n\n  // Retorna o novo formato desejado\n  return {\n    json: {\n      agent_name: item.json.agent_name.trim(),\n      total: totalSum\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43936, 18224],
+      "id": "5b83ecc7-27eb-4df6-90e7-16277e3b627b",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Prepara a lista de agentes (unificando dados reais e mocados)\nconst agentsData = items.map(item => ({\n  name: item.json.agent_name,\n  total_90_days: item.json.total,\n  isHuman: true \n}));\n\n// Injetando dados mocados conforme solicitado\nagentsData.push({ name: \"Yooga Suporte\", total_90_days: 3634, isHuman: true });\nagentsData.push({ name: \"Care AI\", total_90_days: 14696, isHuman: false });\n\nlet totalTenMinCapacity = 0;\nlet humanAgentCount = 0;\nlet detailedResults = [];\n\n// 2. Realiza os cálculos de base para cada entidade\nagentsData.forEach(agent => {\n  const total = agent.total_90_days;\n  \n  // Lógica de médias sucessivas\n  const mediaMensal = total / 3;\n  const mediaDiaria = Math.ceil(mediaMensal / 20); // Arredonda para cima conforme regra\n  const mediaHora = mediaDiaria / 8;\n  const media10Min = mediaHora / 6;\n\n  // Acumula a capacidade para o cálculo do time\n  totalTenMinCapacity += media10Min;\n\n  // Conta apenas humanos para o divisor final\n  if (agent.isHuman) {\n    humanAgentCount++;\n  }\n\n  detailedResults.push({\n    agente: agent.name,\n    total_trimestral: total,\n    media_10_min: parseFloat(media10Min.toFixed(4)),\n    tipo: agent.isHuman ? \"Humano\" : \"IA\"\n  });\n});\n\n// 3. Cálculos Finais de Capacidade (Webchat e WhatsApp)\n\n// Capacity Webchat: Soma das médias / quantidade de humanos\nconst capacity_webchat = humanAgentCount > 0 ? (totalTenMinCapacity / humanAgentCount) : 0;\n\n// Capacity WhatsApp: (Capacity Webchat * 4) / 3\nconst capacity_whatsapp = (capacity_webchat * 4) / 3;\n\n// Retorno estruturado\nreturn [{\n  json: {\n    capacity_webchat: parseFloat(capacity_webchat.toFixed(4)),\n    capacity_whatsapp: parseFloat(capacity_whatsapp.toFixed(4)),\n    total_agentes_humanos: humanAgentCount,\n    total_entidades_processadas: agentsData.length,\n    detalhes_por_agente: detailedResults\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43712, 17888],
+      "id": "2aef8878-8914-43b8-addc-8247ceeb181f",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "jsCode": "// O n8n recebe os dados em um array chamado 'items'\nreturn items.map(item => {\n  let totalSum = 0;\n\n  // 1. Acessa o array 'data'\n  if (item.json.data && Array.isArray(item.json.data)) {\n    item.json.data.forEach(dataEntry => {\n      \n      // 2. Acessa o array 'series' dentro de cada dataEntry\n      if (dataEntry.series && Array.isArray(dataEntry.series)) {\n        dataEntry.series.forEach(serie => {\n          \n          // 3. Acessa o array 'values' dentro de cada serie\n          if (serie.values && Array.isArray(serie.values)) {\n            serie.values.forEach(valObj => {\n              \n              // 4. Converte a string \"16.0\" para número e soma\n              const numericValue = parseFloat(valObj.value) || 0;\n              totalSum += numericValue;\n            });\n          }\n        });\n      }\n    });\n  }\n\n  // Retorna o novo formato desejado\n  return {\n    json: {\n      agent_name: item.json.agent_name.trim(),\n      total: totalSum\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43936, 17888],
+      "id": "f27621cd-e6a6-40c0-8612-adc6cef6a5fd",
+      "name": "Code in JavaScript11"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Prepara a lista de agentes (unificando dados reais e mocados)\nconst agentsData = items.map(item => ({\n  name: item.json.agent_name,\n  total_90_days: item.json.total,\n  isHuman: true \n}));\n\n// Injetando dados mocados conforme solicitado\nagentsData.push({ name: \"Yooga Suporte\", total_90_days: 3634, isHuman: true });\nagentsData.push({ name: \"Care AI\", total_90_days: 14696, isHuman: false });\n\nlet totalTenMinCapacity = 0;\nlet humanAgentCount = 0;\nlet detailedResults = [];\n\n// 2. Realiza os cálculos de base para cada entidade\nagentsData.forEach(agent => {\n  const total = agent.total_90_days;\n  \n  // Lógica de médias sucessivas\n  const mediaMensal = total / 3;\n  const mediaDiaria = Math.ceil(mediaMensal / 20); // Arredonda para cima conforme regra\n  const mediaHora = mediaDiaria / 8;\n  const media10Min = mediaHora / 6;\n\n  // Acumula a capacidade para o cálculo do time\n  totalTenMinCapacity += media10Min;\n\n  // Conta apenas humanos para o divisor final\n  if (agent.isHuman) {\n    humanAgentCount++;\n  }\n\n  detailedResults.push({\n    agente: agent.name,\n    total_trimestral: total,\n    media_10_min: parseFloat(media10Min.toFixed(4)),\n    tipo: agent.isHuman ? \"Humano\" : \"IA\"\n  });\n});\n\n// 3. Cálculos Finais de Capacidade (Webchat e WhatsApp)\n\n// Capacity Webchat: Soma das médias / quantidade de humanos\nconst capacity_webchat = humanAgentCount > 0 ? (totalTenMinCapacity / humanAgentCount) : 0;\n\n// Capacity WhatsApp: (Capacity Webchat * 4) / 3\nconst capacity_whatsapp = (capacity_webchat * 4) / 3;\n\n// Retorno estruturado\nreturn [{\n  json: {\n    capacity_webchat: parseFloat(capacity_webchat.toFixed(4)),\n    capacity_whatsapp: parseFloat(capacity_whatsapp.toFixed(4)),\n    total_agentes_humanos: humanAgentCount,\n    total_entidades_processadas: agentsData.length,\n    detalhes_por_agente: detailedResults\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43712, 18064],
+      "id": "445a015d-cb9a-4d87-a6b7-dc64b57e16a4",
+      "name": "Code in JavaScript12"
+    },
+    {
+      "parameters": {
+        "jsCode": "// O n8n recebe os dados em um array chamado 'items'\nreturn items.map(item => {\n  let totalSum = 0;\n\n  // 1. Acessa o array 'data'\n  if (item.json.data && Array.isArray(item.json.data)) {\n    item.json.data.forEach(dataEntry => {\n      \n      // 2. Acessa o array 'series' dentro de cada dataEntry\n      if (dataEntry.series && Array.isArray(dataEntry.series)) {\n        dataEntry.series.forEach(serie => {\n          \n          // 3. Acessa o array 'values' dentro de cada serie\n          if (serie.values && Array.isArray(serie.values)) {\n            serie.values.forEach(valObj => {\n              \n              // 4. Converte a string \"16.0\" para número e soma\n              const numericValue = parseFloat(valObj.value) || 0;\n              totalSum += numericValue;\n            });\n          }\n        });\n      }\n    });\n  }\n\n  // Retorna o novo formato desejado\n  return {\n    json: {\n      agent_name: item.json.agent_name.trim(),\n      total: totalSum\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43936, 18064],
+      "id": "290ee3e6-9882-4c94-9714-1bed648afd72",
+      "name": "Code in JavaScript13"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Prepara a lista de agentes (unificando dados reais e mocados)\nconst agentsData = items.map(item => ({\n  name: item.json.agent_name,\n  total_90_days: item.json.total,\n  isHuman: true \n}));\n\n// Injetando dados mocados conforme solicitado\nagentsData.push({ name: \"Yooga Suporte\", total_90_days: 3634, isHuman: true });\nagentsData.push({ name: \"Care AI\", total_90_days: 14696, isHuman: false });\n\nlet totalTenMinCapacity = 0;\nlet humanAgentCount = 0;\nlet detailedResults = [];\n\n// 2. Realiza os cálculos de base para cada entidade\nagentsData.forEach(agent => {\n  const total = agent.total_90_days;\n  \n  // Lógica de médias sucessivas\n  const mediaMensal = total / 3;\n  const mediaDiaria = Math.ceil(mediaMensal / 20); // Arredonda para cima conforme regra\n  const mediaHora = mediaDiaria / 8;\n  const media10Min = mediaHora / 6;\n\n  // Acumula a capacidade para o cálculo do time\n  totalTenMinCapacity += media10Min;\n\n  // Conta apenas humanos para o divisor final\n  if (agent.isHuman) {\n    humanAgentCount++;\n  }\n\n  detailedResults.push({\n    agente: agent.name,\n    total_trimestral: total,\n    media_10_min: parseFloat(media10Min.toFixed(4)),\n    tipo: agent.isHuman ? \"Humano\" : \"IA\"\n  });\n});\n\n// 3. Cálculos Finais de Capacidade (Webchat e WhatsApp)\n\n// Capacity Webchat: Soma das médias / quantidade de humanos\nconst capacity_webchat = humanAgentCount > 0 ? (totalTenMinCapacity / humanAgentCount) : 0;\n\n// Capacity WhatsApp: (Capacity Webchat * 4) / 3\nconst capacity_whatsapp = (capacity_webchat * 4) / 3;\n\n// Retorno estruturado\nreturn [{\n  json: {\n    capacity_webchat: parseFloat(capacity_webchat.toFixed(4)),\n    capacity_whatsapp: parseFloat(capacity_whatsapp.toFixed(4)),\n    total_agentes_humanos: humanAgentCount,\n    total_entidades_processadas: agentsData.length,\n    detalhes_por_agente: detailedResults\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43712, 18224],
+      "id": "637c9405-9310-4344-8be5-9ef28bb596ef",
+      "name": "Code in JavaScript14"
+    },
+    {
+      "parameters": {
+        "jsCode": "// O n8n recebe os dados em um array chamado 'items'\nreturn items.map(item => {\n  let totalSum = 0;\n\n  // 1. Acessa o array 'data'\n  if (item.json.data && Array.isArray(item.json.data)) {\n    item.json.data.forEach(dataEntry => {\n      \n      // 2. Acessa o array 'series' dentro de cada dataEntry\n      if (dataEntry.series && Array.isArray(dataEntry.series)) {\n        dataEntry.series.forEach(serie => {\n          \n          // 3. Acessa o array 'values' dentro de cada serie\n          if (serie.values && Array.isArray(serie.values)) {\n            serie.values.forEach(valObj => {\n              \n              // 4. Converte a string \"16.0\" para número e soma\n              const numericValue = parseFloat(valObj.value) || 0;\n              totalSum += numericValue;\n            });\n          }\n        });\n      }\n    });\n  }\n\n  // Retorna o novo formato desejado\n  return {\n    json: {\n      agent_name: item.json.agent_name.trim(),\n      total: totalSum\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43952, 18400],
+      "id": "f23b6e68-4130-48db-821f-8b368986e4fc",
+      "name": "Code in JavaScript15"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Prepara a lista de agentes (unificando dados reais e mocados)\nconst agentsData = items.map(item => ({\n  name: item.json.agent_name,\n  total_90_days: item.json.total,\n  isHuman: true \n}));\n\n// Injetando dados mocados conforme solicitado\nagentsData.push({ name: \"Yooga Suporte\", total_90_days: 3634, isHuman: true });\nagentsData.push({ name: \"Care AI\", total_90_days: 14696, isHuman: false });\n\nlet totalTenMinCapacity = 0;\nlet humanAgentCount = 0;\nlet detailedResults = [];\n\n// 2. Realiza os cálculos de base para cada entidade\nagentsData.forEach(agent => {\n  const total = agent.total_90_days;\n  \n  // Lógica de médias sucessivas\n  const mediaMensal = total / 3;\n  const mediaDiaria = Math.ceil(mediaMensal / 20); // Arredonda para cima conforme regra\n  const mediaHora = mediaDiaria / 8;\n  const media10Min = mediaHora / 6;\n\n  // Acumula a capacidade para o cálculo do time\n  totalTenMinCapacity += media10Min;\n\n  // Conta apenas humanos para o divisor final\n  if (agent.isHuman) {\n    humanAgentCount++;\n  }\n\n  detailedResults.push({\n    agente: agent.name,\n    total_trimestral: total,\n    media_10_min: parseFloat(media10Min.toFixed(4)),\n    tipo: agent.isHuman ? \"Humano\" : \"IA\"\n  });\n});\n\n// 3. Cálculos Finais de Capacidade (Webchat e WhatsApp)\n\n// Capacity Webchat: Soma das médias / quantidade de humanos\nconst capacity_webchat = humanAgentCount > 0 ? (totalTenMinCapacity / humanAgentCount) : 0;\n\n// Capacity WhatsApp: (Capacity Webchat * 4) / 3\nconst capacity_whatsapp = (capacity_webchat * 4) / 3;\n\n// Retorno estruturado\nreturn [{\n  json: {\n    capacity_webchat: parseFloat(capacity_webchat.toFixed(4)),\n    capacity_whatsapp: parseFloat(capacity_whatsapp.toFixed(4)),\n    total_agentes_humanos: humanAgentCount,\n    total_entidades_processadas: agentsData.length,\n    detalhes_por_agente: detailedResults\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-43728, 18400],
+      "id": "65ac2a5d-8ea2-42db-8655-b03f00c0c572",
+      "name": "Code in JavaScript16"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "terça-feira",
+              "field2": "agent_name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44112, 17568],
+      "id": "6e132eb3-1f4a-4fb2-adf7-fc34d8debb7c",
+      "name": "TERÇA"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "quarta-feira",
+              "field2": "agent_name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44112, 17744],
+      "id": "5a535617-0d69-47c8-a36d-bfead0dc7642",
+      "name": "QUARTA"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "121b9a04-b401-4021-8b45-4d30710c9af7",
+              "name": "capacity_webchat_segunda",
+              "value": "={{ $json.capacity_webchat }}",
+              "type": "number"
+            },
+            {
+              "id": "3db0811f-af78-42c2-bf45-d0cffe518942",
+              "name": "capacity_whatsapp_segunda",
+              "value": "={{ $json.capacity_whatsapp }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-43504, 17408],
+      "id": "a0726a5d-1d68-49ff-ad37-30f6b2f3b011",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "121b9a04-b401-4021-8b45-4d30710c9af7",
+              "name": "capacity_webchat_terca",
+              "value": "={{ $json.capacity_webchat }}",
+              "type": "number"
+            },
+            {
+              "id": "3db0811f-af78-42c2-bf45-d0cffe518942",
+              "name": "capacity_whatsapp_terca",
+              "value": "={{ $json.capacity_whatsapp }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-43504, 17568],
+      "id": "d4f3bcaa-9b94-4d9e-9199-cb1c559e2e6c",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "121b9a04-b401-4021-8b45-4d30710c9af7",
+              "name": "capacity_webchat_quarta",
+              "value": "={{ $json.capacity_webchat }}",
+              "type": "number"
+            },
+            {
+              "id": "3db0811f-af78-42c2-bf45-d0cffe518942",
+              "name": "capacity_whatsapp_quarta",
+              "value": "={{ $json.capacity_whatsapp }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-43504, 17744],
+      "id": "180b5502-6e24-49c5-840b-8e8f3f0d4f4c",
+      "name": "Edit Fields4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "121b9a04-b401-4021-8b45-4d30710c9af7",
+              "name": "capacity_webchat_sexta",
+              "value": "={{ $json.capacity_webchat }}",
+              "type": "number"
+            },
+            {
+              "id": "3db0811f-af78-42c2-bf45-d0cffe518942",
+              "name": "capacity_whatsapp_sexta",
+              "value": "={{ $json.capacity_whatsapp }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-43504, 18064],
+      "id": "da549071-6c27-49e5-837f-698ff4e969cd",
+      "name": "Edit Fields5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "121b9a04-b401-4021-8b45-4d30710c9af7",
+              "name": "capacity_webchat_sabado",
+              "value": "={{ $json.capacity_webchat }}",
+              "type": "number"
+            },
+            {
+              "id": "3db0811f-af78-42c2-bf45-d0cffe518942",
+              "name": "capacity_whatsapp_sabado",
+              "value": "={{ $json.capacity_whatsapp }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-43504, 18224],
+      "id": "70dcce97-459f-44c5-9c04-dd927e6b2be3",
+      "name": "Edit Fields6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "121b9a04-b401-4021-8b45-4d30710c9af7",
+              "name": "capacity_webchat_domngo",
+              "value": "={{ $json.capacity_webchat }}",
+              "type": "number"
+            },
+            {
+              "id": "3db0811f-af78-42c2-bf45-d0cffe518942",
+              "name": "capacity_whatsapp_domingo",
+              "value": "={{ $json.capacity_whatsapp }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-43504, 18400],
+      "id": "fb0a30c3-2a0a-4771-ad33-d86fd1dc3efd",
+      "name": "Edit Fields7"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "121b9a04-b401-4021-8b45-4d30710c9af7",
+              "name": "capacity_webchat_quinta",
+              "value": "={{ $json.capacity_webchat }}",
+              "type": "number"
+            },
+            {
+              "id": "3db0811f-af78-42c2-bf45-d0cffe518942",
+              "name": "capacity_whatsapp_quinta",
+              "value": "={{ $json.capacity_whatsapp }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-43504, 17888],
+      "id": "75b06821-b902-48f5-8b9f-5f477345a948",
+      "name": "Edit Fields8"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "quinta-feira",
+              "field2": "agent_name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44128, 17888],
+      "id": "ef9e827d-868f-4faa-914f-208fa36b30f2",
+      "name": "QUINTA"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "sexta-feira",
+              "field2": "agent_name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44128, 18064],
+      "id": "911134e7-95e3-44ba-8b8d-e0d7d70b1ebe",
+      "name": "SEXTA"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "sábado",
+              "field2": "agent_name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44128, 18224],
+      "id": "57fdc699-728c-45fc-9db4-83096b69f6b2",
+      "name": "SABADO"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-42704, 17488],
+      "id": "182cd8f2-6f74-4794-838c-43ec08478090",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "numberInputs": 7
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-42992, 17920],
+      "id": "90c996b9-9d0b-4d54-8f65-93b3f0c11248",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "capacity_webchat, capacity_whatsapp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-42112, 17488],
+      "id": "0954fb8a-fbb5-47b8-9f28-23bedf314686",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-42672, 17728],
+      "id": "cad19fa7-b43b-4507-b31b-656390682d36",
+      "name": "Wait",
+      "webhookId": "e720f040-5188-4fb1-9f90-e10257b56fba"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0",
+          "mode": "list",
+          "cachedResultName": "Cópia de Escala e Previsão - Maio/2026",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1735069672,
+          "mode": "list",
+          "cachedResultName": "QUERY - qtd_agentes_dia",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0/edit#gid=1735069672"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-43264, 17248],
+      "id": "483f715d-eb7f-48db-96e8-a08c18216886",
+      "name": "Quantidade de Agentes pro Webchat",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "19G8C8lf6q2-ihC6JLGPbb1u7KN2giCO5rFuiKvLCupQ",
+          "mode": "list",
+          "cachedResultName": "Cópia de Dimensionamento Care",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19G8C8lf6q2-ihC6JLGPbb1u7KN2giCO5rFuiKvLCupQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1569152602,
+          "mode": "list",
+          "cachedResultName": "Maio-26-Webchat",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19G8C8lf6q2-ihC6JLGPbb1u7KN2giCO5rFuiKvLCupQ/edit#gid=1569152602"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRangeA1",
+              "range": "AI2:AP140"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-42480, 17728],
+      "id": "e6930a35-3299-4d07-8931-ded7142889e4",
+      "name": "Quantidade de Agentes para o Whatsapp",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-42176, 17872],
+      "id": "ec4683fd-e8b0-4d52-8cb0-98d77be2f41b",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "capacity_webchat, capacity_whatsapp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-41776, 17872],
+      "id": "5c414250-aa59-4e65-a7bb-67bf719ef112",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Código para n8n - Calcular capacidade de atendimento por canal\n// Multiplica quantidade de agentes pela capacidade média do time\n\n// Recebe o input do n8n\nconst inputData = $input.all();\n\n// Extrai os dados do JSON\nconst allItems = inputData.map(item => item.json);\n\n// Separa os dados de escala (linhas com row_number) dos dados de capacidade\nconst scheduleData = [];\nconst capacityData = {};\n\nfor (const item of allItems) {\n  if ('row_number' in item) {\n    scheduleData.push(item);\n  } else if ('capacity_webchat_segunda' in item) {\n    capacityData['segunda'] = {\n      webchat: item.capacity_webchat_segunda,\n      whatsapp: item.capacity_whatsapp_segunda\n    };\n  } else if ('capacity_webchat_terca' in item) {\n    capacityData['terca'] = {\n      webchat: item.capacity_webchat_terca,\n      whatsapp: item.capacity_whatsapp_terca\n    };\n  } else if ('capacity_webchat_quarta' in item) {\n    capacityData['quarta'] = {\n      webchat: item.capacity_webchat_quarta,\n      whatsapp: item.capacity_whatsapp_quarta\n    };\n  } else if ('capacity_webchat_quinta' in item) {\n    capacityData['quinta'] = {\n      webchat: item.capacity_webchat_quinta,\n      whatsapp: item.capacity_whatsapp_quinta\n    };\n  } else if ('capacity_webchat_sexta' in item) {\n    capacityData['sexta'] = {\n      webchat: item.capacity_webchat_sexta,\n      whatsapp: item.capacity_whatsapp_sexta\n    };\n  } else if ('capacity_webchat_sabado' in item) {\n    capacityData['sabado'] = {\n      webchat: item.capacity_webchat_sabado,\n      whatsapp: item.capacity_whatsapp_sabado\n    };\n  } else if ('capacity_webchat_domngo' in item) {  // Nota: typo no original \"domngo\"\n    capacityData['domingo'] = {\n      webchat: item.capacity_webchat_domngo,\n      whatsapp: item.capacity_whatsapp_domingo\n    };\n  }\n}\n\n// Mapeamento das colunas para os dias da semana\nconst dayMapping = {\n  'SEG': 'segunda',\n  'TER': 'terca',\n  'QUA': 'quarta',\n  'QUI': 'quinta',\n  'SEX': 'sexta',\n  'SABADO': 'sabado',\n  'DOMINGO': 'domingo'\n};\n\n// Gera as tabelas de capacidade\nconst capacityWebchat = [];\nconst capacityWhatsapp = [];\n\nfor (const row of scheduleData) {\n  const webchatRow = {\n    row_number: row.row_number,\n    HORA: row.HORA\n  };\n  const whatsappRow = {\n    row_number: row.row_number,\n    HORA: row.HORA\n  };\n  \n  for (const [col, dayKey] of Object.entries(dayMapping)) {\n    if (col in row && dayKey in capacityData) {\n      const agents = row[col];\n      \n      // Calcula capacidade webchat (arredonda para 2 casas decimais)\n      const webchatCapacity = Math.round(agents * capacityData[dayKey].webchat * 100) / 100;\n      webchatRow[col] = webchatCapacity;\n      \n      // Calcula capacidade whatsapp (arredonda para 2 casas decimais)\n      const whatsappCapacity = Math.round(agents * capacityData[dayKey].whatsapp * 100) / 100;\n      whatsappRow[col] = whatsappCapacity;\n    }\n  }\n  \n  capacityWebchat.push(webchatRow);\n  capacityWhatsapp.push(whatsappRow);\n}\n\n// Retorna os resultados no formato n8n\n// Retorna um único objeto com as duas tabelas separadas\nreturn [{\n  json: {\n    capacity_webchat: capacityWebchat,\n    capacity_whatsapp: capacityWhatsapp\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-41968, 17872],
+      "id": "a929e8c6-2563-4e0f-8ded-4db1f8bcb436",
+      "name": "Calculo do Capacity1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Código para n8n - Calcular capacidade de atendimento por canal\n// Multiplica quantidade de agentes pela capacidade média do time\n\n// Recebe o input do n8n\nconst inputData = $input.all();\n\n// Extrai os dados do JSON\nconst allItems = inputData.map(item => item.json);\n\n// Separa os dados de escala (linhas com row_number) dos dados de capacidade\nconst scheduleData = [];\nconst capacityData = {};\n\nfor (const item of allItems) {\n  if ('row_number' in item) {\n    scheduleData.push(item);\n  } else if ('capacity_webchat_segunda' in item) {\n    capacityData['segunda'] = {\n      webchat: item.capacity_webchat_segunda,\n      whatsapp: item.capacity_whatsapp_segunda\n    };\n  } else if ('capacity_webchat_terca' in item) {\n    capacityData['terca'] = {\n      webchat: item.capacity_webchat_terca,\n      whatsapp: item.capacity_whatsapp_terca\n    };\n  } else if ('capacity_webchat_quarta' in item) {\n    capacityData['quarta'] = {\n      webchat: item.capacity_webchat_quarta,\n      whatsapp: item.capacity_whatsapp_quarta\n    };\n  } else if ('capacity_webchat_quinta' in item) {\n    capacityData['quinta'] = {\n      webchat: item.capacity_webchat_quinta,\n      whatsapp: item.capacity_whatsapp_quinta\n    };\n  } else if ('capacity_webchat_sexta' in item) {\n    capacityData['sexta'] = {\n      webchat: item.capacity_webchat_sexta,\n      whatsapp: item.capacity_whatsapp_sexta\n    };\n  } else if ('capacity_webchat_sabado' in item) {\n    capacityData['sabado'] = {\n      webchat: item.capacity_webchat_sabado,\n      whatsapp: item.capacity_whatsapp_sabado\n    };\n  } else if ('capacity_webchat_domngo' in item) {  // Nota: typo no original \"domngo\"\n    capacityData['domingo'] = {\n      webchat: item.capacity_webchat_domngo,\n      whatsapp: item.capacity_whatsapp_domingo\n    };\n  }\n}\n\n// Mapeamento das colunas para os dias da semana\nconst dayMapping = {\n  'SEG': 'segunda',\n  'TER': 'terca',\n  'QUA': 'quarta',\n  'QUI': 'quinta',\n  'SEX': 'sexta',\n  'SABADO': 'sabado',\n  'DOMINGO': 'domingo'\n};\n\n// Gera as tabelas de capacidade\nconst capacityWebchat = [];\nconst capacityWhatsapp = [];\n\nfor (const row of scheduleData) {\n  const webchatRow = {\n    row_number: row.row_number,\n    HORA: row.HORA\n  };\n  const whatsappRow = {\n    row_number: row.row_number,\n    HORA: row.HORA\n  };\n  \n  for (const [col, dayKey] of Object.entries(dayMapping)) {\n    if (col in row && dayKey in capacityData) {\n      const agents = row[col];\n      \n      // Calcula capacidade webchat (arredonda para 2 casas decimais)\n      const webchatCapacity = Math.round(agents * capacityData[dayKey].webchat * 100) / 100;\n      webchatRow[col] = webchatCapacity;\n      \n      // Calcula capacidade whatsapp (arredonda para 2 casas decimais)\n      const whatsappCapacity = Math.round(agents * capacityData[dayKey].whatsapp * 100) / 100;\n      whatsappRow[col] = whatsappCapacity;\n    }\n  }\n  \n  capacityWebchat.push(webchatRow);\n  capacityWhatsapp.push(whatsappRow);\n}\n\n// Retorna os resultados no formato n8n\n// Retorna um único objeto com as duas tabelas separadas\nreturn [{\n  json: {\n    capacity_webchat: capacityWebchat,\n    capacity_whatsapp: capacityWhatsapp\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-42496, 17488],
+      "id": "808110c7-8633-4815-89d7-d2a51dd77976",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "84a9f87b-a37a-4bd5-8f63-455d6b50b140",
+              "name": "care_ai",
+              "value": "14394",
+              "type": "string"
+            },
+            {
+              "id": "4c7585d7-7153-4b80-9d23-68f677624634",
+              "name": "Yooga Suporte",
+              "value": "3978",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-44592, 17600],
+      "id": "106e71b0-4856-4b17-8e57-7d01979425c5",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mapeia todos os itens recebidos para o formato de matriz (lista de listas)\nconst values = items.map(item => {\n  // Acessa o objeto especifico (ajuste se vier de capacity_whatsapp ou outro)\n  const dado = item.json.capacity_whatsapp; \n  \n  // Retorna a ordem exata das colunas K, L, M, N, O, P, Q\n  return [\n    dado.SEG,\n    dado.TER,\n    dado.QUA,\n    dado.QUI,\n    dado.SEX,\n    dado.SABADO,\n    dado.DOMINGO\n  ];\n});\n\n// Retorna um único item com a estrutura que a API do Google exige\nreturn {\n  json: {\n    values: values\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-41568, 17872],
+      "id": "b2e38458-1c87-45bf-a265-a1fd3bf11b22",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mapeia todos os itens recebidos para o formato de matriz (lista de listas)\nconst values = items.map(item => {\n  // Acessa o objeto especifico (ajuste se vier de capacity_whatsapp ou outro)\n  const dado = item.json.capacity_webchat; \n  \n  // Retorna a ordem exata das colunas K, L, M, N, O, P, Q\n  return [\n    dado.SEG,\n    dado.TER,\n    dado.QUA,\n    dado.QUI,\n    dado.SEX,\n    dado.SABADO,\n    dado.DOMINGO\n  ];\n});\n\n// Retorna um único item com a estrutura que a API do Google exige\nreturn {\n  json: {\n    values: values\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-41904, 17488],
+      "id": "4d9341ff-95bc-468f-ba11-318f5ef9d94a",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/19G8C8lf6q2-ihC6JLGPbb1u7KN2giCO5rFuiKvLCupQ/values/Maio-26-Webchat!K2:Q140",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueInputOption",
+              "value": "USER_ENTERED"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"values\": $json.values\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-41712, 17488],
+      "id": "682779ad-c467-47c4-89b5-58f82623b82c",
+      "name": "Atualizar o capacity dos agentes no webchat",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/19G8C8lf6q2-ihC6JLGPbb1u7KN2giCO5rFuiKvLCupQ/values/Maio-26-Whatsapp!K2:Q140",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueInputOption",
+              "value": "USER_ENTERED"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"values\": $json.values\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-41360, 17872],
+      "id": "b7470b4e-69f1-4041-95f1-5c26222c7cf1",
+      "name": "Atualizar o capacity dos agentes no whatsapp",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://sheets.googleapis.com/v4/spreadsheets/19G8C8lf6q2-ihC6JLGPbb1u7KN2giCO5rFuiKvLCupQ/values/Maio-26-Whatsapp!AH2:AO140",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueRenderOption",
+              "value": "FORMATTED_VALUE"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-41104, 17872],
+      "id": "f5994a65-00cc-4568-a85d-673163ef391c",
+      "name": "Verifica a quantidade de agentes que faltam por horário",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pageId": {
+          "__rl": true,
+          "value": "https://www.notion.so/Dimensionamento-Care-2fff321e21f880d3a667d343517201a1",
+          "mode": "url"
+        },
+        "title": "=Dimensionamento - {{$now}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [-45168, 17168],
+      "id": "016c41d1-fa3d-4c6c-932d-4ca5158627a8",
+      "name": "Create a page",
+      "credentials": {
+        "notionApi": {
+          "id": "kXCFie5jMrzj6YIw",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-40128, 17168],
+      "id": "26d7b42f-77c4-4451-a558-a280adf42a5f",
+      "name": "Merge3"
+    },
+    {
+      "parameters": {
+        "resource": "block",
+        "blockId": {
+          "__rl": true,
+          "value": "={{ $json.url }}",
+          "mode": "url"
+        },
+        "blockUi": {
+          "blockValues": [
+            {
+              "textContent": "={{ $json.output_chunks }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [-38656, 17328],
+      "id": "8c53cfe4-2aa8-4905-b3c4-66c7d510576e",
+      "name": "Append a block",
+      "credentials": {
+        "notionApi": {
+          "id": "kXCFie5jMrzj6YIw",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega os valores retornados pelo Google Sheets\n// Supondo que o output do HTTP Request seja um array de arrays: [\"07:00\", \"1\", \"0\"...]\nconst linhas = items[0].json.values;\n\n// Cabeçalho exigido pelo Prompt do Agente\nlet tabelaFormatada = \"start_time\\tend_time\\tseg\\tter\\tqua\\tqui\\tsex\\tsáb\\tdom\\n\";\n\n// Função auxiliar para somar minutos ao horário (ex: 07:00 + 10min = 07:10)\nfunction adicionarMinutos(horario, minutos) {\n  if (!horario) return \"00:00\";\n  let [h, m] = horario.split(':').map(Number);\n  let date = new Date();\n  date.setHours(h, m + minutos);\n  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });\n}\n\n// Loop para montar a tabela linha por linha\nfor (let i = 0; i < linhas.length; i++) {\n  const linha = linhas[i];\n  \n  // Coluna 0 é o Start Time (ex: \"07:00\")\n  const startTime = linha[0];\n  \n  // Calculamos o End Time (Start Time + 10 minutos)\n  const endTime = adicionarMinutos(startTime, 10);\n\n  // Formata os números (arredonda para 2 casas decimais para evitar 0.230769...)\n  // Se o valor for \"0\", mantém 0. Se for decimal, arredonda.\n  const dias = linha.slice(1, 8).map(val => {\n    let num = parseFloat(val.toString().replace(',', '.')); // Garante que lê \"0,23\" como numero\n    if (isNaN(num)) return \"0\";\n    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(2); // Inteiro ou 2 casas decimais\n  });\n\n  // Monta a linha da tabela separada por TAB (ideal para LLMs)\n  tabelaFormatada += `${startTime}\\t${endTime}\\t${dias[0]}\\t${dias[1]}\\t${dias[2]}\\t${dias[3]}\\t${dias[4]}\\t${dias[5]}\\t${dias[6]}\\n`;\n}\n\n// Retorna o texto pronto para ser usado no Agente\nreturn {\n  json: {\n    tabela_para_agente: tabelaFormatada\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40864, 17872],
+      "id": "32c828b3-0caa-4608-a2cf-205c682d7ea7",
+      "name": "Code in JavaScript17"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Limite do Notion (2000 caracteres)\nconst MAX_LENGTH = 2000;\n\nreturn items.map(item => {\n  const originalText = item.json.output || \"\";\n  const chunks = [];\n  let currentChunk = \"\";\n\n  // 1. Divide o texto por quebras de linha para tentar manter parágrafos\n  const paragraphs = originalText.split('\\n');\n\n  for (let i = 0; i < paragraphs.length; i++) {\n    const paragraph = paragraphs[i];\n\n    // Verifica se adicionar este parágrafo vai estourar o limite (considerando o \\n extra)\n    if ((currentChunk.length + paragraph.length + 1) > MAX_LENGTH) {\n      \n      // Se o chunk atual já tem conteúdo, salvamos ele e limpamos a variável\n      if (currentChunk.length > 0) {\n        chunks.push(currentChunk);\n        currentChunk = \"\";\n      }\n\n      // CASO EXTREMO: O parágrafo sozinho é maior que 2000 caracteres?\n      if (paragraph.length > MAX_LENGTH) {\n        let tempPara = paragraph;\n        // Corta o parágrafo gigante em pedaços de 2000\n        while (tempPara.length > 0) {\n          // Pega os primeiros 2000 caracteres\n          let slice = tempPara.slice(0, MAX_LENGTH);\n          \n          // Tenta não cortar uma palavra ao meio: procura o último espaço\n          if (tempPara.length > MAX_LENGTH) {\n             const lastSpace = slice.lastIndexOf(' ');\n             if (lastSpace > 0) slice = slice.slice(0, lastSpace);\n          }\n          \n          chunks.push(slice);\n          tempPara = tempPara.slice(slice.length).trim();\n        }\n      } else {\n        // Se o parágrafo cabe no limite (mas não cabia no chunk anterior), ele inicia o novo chunk\n        currentChunk = paragraph;\n      }\n\n    } else {\n      // Se cabe, adiciona ao chunk atual (com quebra de linha se não for o primeiro)\n      if (currentChunk.length > 0) {\n        currentChunk += \"\\n\" + paragraph;\n      } else {\n        currentChunk = paragraph;\n      }\n    }\n  }\n\n  // Adiciona o que sobrou no final\n  if (currentChunk.length > 0) {\n    chunks.push(currentChunk);\n  }\n\n  // Retorna todos os dados originais + o campo novo 'output_chunks'\n  return {\n    json: {\n      ...item.json,\n      output_chunks: chunks\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-39744, 17168],
+      "id": "aaa3e5dc-0ced-4d7c-b499-bf51fa549e23",
+      "name": "Code in JavaScript18"
+    },
+    {
+      "parameters": {
+        "batchSize": 2,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-38976, 17168],
+      "id": "44ae27eb-f6b0-47c2-b5ea-a89e0100982d",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-38592, 17152],
+      "id": "8402031a-110a-4a1f-9c23-e1caaf9c4fc8",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output_chunks",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "id, name, url",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-39280, 17168],
+      "id": "9754ec1d-2d38-420b-83ff-0d27411b67ea",
+      "name": "Split Out2"
+    },
+    {
+      "parameters": {
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "={{ $json.systemPrompt }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [-40368, 17872],
+      "id": "7f597ae7-a265-4fa9-b724-54d82391747b",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "systemPrompt",
+              "value": "=Você é um analista responsável pela verificação que define a quantidade de agentes que devem ser contratados a cada mês para um time de suporte. \n\nRegras obrigatórias para montagem da escala:\n\nTodas as escalas sugeridas devem terminar no máximo às 00:00.\n\nÉ proibido sugerir qualquer escala com término após 00:00.\n\nOs horários de início e fim devem ser sempre em hora cheia (:00).\n\nNão utilizar horários fracionados ou quebrados, como :10, :20, :30, :40 ou :50.\n\nExemplos válidos: 07:00 às 16:00, 10:00 às 19:00, 15:00 às 00:00.\n\nExemplos inválidos: 07:10 às 16:10, 11:20 às 20:20, 14:30 às 23:30, 16:00 às 01:00.\n\nEssas são suas instruções, suas análises SEMPRE devem se basear nelas.\n\nInstruções:\n1) Você sempre receberá como imput em cada novo chat da quantidade de agentes que está faltando em cada horário para completar o atendimento do time, por exemplo:\n\nstart_time\tend_time\tseg\tter\tqua\tqui\tsex\tsáb\tdom\n10:00\t10:10\t1\t1\t1\t1\t1\t1\t1\n10:20\t10:30\t2\t1\t1\t1\t1\t1\t0\n\nOu seja, de 10hrs até 10:10hrs faltam 1 agente novo para todos os dias da semana, de 10:20 a 10:30 faltam 2 agentes na segunda feira, 1 agente de terça até sábado e nenhum no domingo.\n\n2) Sua análise também SEMPRE deve seguir as condições de trabalho dos agentes, são elas:\n\n<b>CONDIÇÕES</b> \n\n1) O máximo de agentes deve ser de 6, entretanto serão contratados no MÁXIMO 4 por mês, ou seja é sempre necessário informar 4 horários para agentes mas caso a conclusão da análise mostre que 4 não é um número suficiente de agentes para remover toda a defasagem de horários, você pode informar isso e repassar mais 2 horários extras.\n\n2) A escala dos agentes é 5x2, ou seja, trabalham 8hrs por dia com 1 hora de almoço 5 dias da semana e folgam por 2 dias.\n\nPor exemplo: \"Agente_3\": (\"09:00\", \"18:00\", [\"ter\", \"qua\", \"qui\", \"sex\", \"sáb\"])\n\n2) O horário deles deve englobar o máximo possível os horários com mais necessidade de agentes na escala, onde aparece o numero 2 por exemplo:\n\nExemplo de horário com maior necessidade:\nstart_time\tend_time\tseg\tter\tqua\tqui\tsex\tsáb\tdom\n10:00\t10:10\t1\t1\t1\t1\t1\t1\t1\n10:20\t10:30\t2\t1\t1\t1\t1\t1\t0\n10:40\t10:50\t1\t2\t2\t2\t2\t1\t1\n11:00\t11:10\t2\t1\t2\t2\t2\t1\t0\n11:20\t11:30\t2\t1\t2\t2\t2\t1\t0\n11:40\t11:50\t2\t1\t1\t1\t2\t1\t1\n12:00\t12:10\t2\t1\t1\t1\t1\t1\t1\n12:20\t12:30\t1\t1\t1\t1\t1\t1\t1\n12:40\t12:50\t1\t1\t1\t1\t1\t1\t1\n\nNo exemplo, é de maior necessidade um agente para segunda á sábado pois nesses dias o número 2 (2 agentes faltando) aparece por mais vezes. lembre-se de SEMPRE fazer a análise de forma a verificar a todos os horários da escala e não apenas uma faixa dele.\n\n3) A folga dos agentes deve ser sempre no intervalo de sábado a terça feira, mas não deve ser sábado e domingo seguidos, e sim sábado e segunda, domingo e segunda, sábado e terça ou domingo e terça.\n\n4) Os dias trabalhados também não devem conter sábado e domingo seguidos, ou seja, caso o agente trabalhe sábado ele precisa necessariamente folgar no domingo e caso ele trabalhe no domingo ele deve folgar no sábado.\n\n5) Informe os dias e horários de cada um dos agentes, por exemplo:\nagents = {\n    \"Agente_1\": (\"09:00\", \"18:00\", [\"ter\", \"qua\", \"qui\", \"sex\", \"sáb\"]),\n    \"Agente_2\": (\"10:00\", \"19:00\", [\"seg\", \"ter\", \"qui\", \"sex\", \"sáb\"]),\n    \"Agente_3\": (\"11:00\", \"20:00\", [\"seg\", \"qua\", \"qui\", \"sex\", \"dom\"]),\n    \"Agente_4\": (\"12:00\", \"21:00\", [\"ter\", \"qua\", \"qui\", \"sex\", \"sáb\"]),\n}\n\n6) Sempre forneça o resultado em ordem de prioridade para as contratações, ou seja, se o agente 1 com o primeiro horário garante melhor cobertura dos horários que o agente 6, ele deve ser informado como a primeira contratação a ser realizada.\n\n7) Sempre forneça uma análise do resultado informado com as suas conclusões.\n\nPor exemplo:\n\nO agente 1 ficou com o horário: \"Agente_1\": (\"09:00\", \"18:00\", [\"ter\", \"qua\", \"qui\", \"sex\", \"sáb\"]),\n\nEle tem maior prioridade pois terça a sábado estão com maior defasagem no começo da manhã e final da tarde. (Lembrando que isso é um exemplo, sua resposta deve ser baseada no imput fornecido sempre.)\n\n8) Sempre forneça os horários dos agentes também no seguinte formato:\n\nagents = {\n    \"Agente_1\": (\"09:00\", \"18:00\", [\"ter\", \"qua\", \"qui\", \"sex\", \"sáb\"]),\n    \"Agente_2\": (\"10:00\", \"19:00\", [\"seg\", \"ter\", \"qui\", \"sex\", \"sáb\"]),\n    \"Agente_3\": (\"11:00\", \"20:00\", [\"seg\", \"qua\", \"qui\", \"sex\", \"dom\"]),\n    \"Agente_4\": (\"12:00\", \"21:00\", [\"ter\", \"qua\", \"qui\", \"sex\", \"sáb\"]),\n}\n\nEsse formato será utilizado em um código para teste de como ficará a escala no futuro e verificação se a análise está correta, então ele é SEMPRE necessário.\n\n9) As 4 primeiras contratações precisam necessariamente levar em conta o resultado que melhor resolva a defasagem para todos os dias, ou seja, é melhor ter dias ou horários com pouca defasagem do que dias hiper dimensionados e outros com grande defasagem.\n\nPor exemplo: Se a segunda feira possui uma grande defasagem de agentes e a terça  uma defasagem um pouco menor mas que ainda existe, é melhor que os agentes 1,2 e 3 sejam contratados para a segunda e pelo menos 1 para a terça. \n\n\n"
+            },
+            {
+              "name": "chatInput",
+              "value": "=Segue a quantidade de agentes que estão faltando para cada horário: {{ $json.tabela_para_agente }}"
+            },
+            {
+              "name": "sessionId",
+              "value": "33e08823-8a62-4dd2-a4b6-8e24e7939f70"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "72ecdb7a-5775-421f-b20a-296fafaff01c",
+      "name": "Prompt para o agente1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [-40656, 17872],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [-40528, 18288],
+      "id": "b97e4d2c-5e33-44f9-87a2-ce33de518376",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "yStGXkT8FCuN2bLU",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "[\n  {\n    \"agente\": \"Agente_1\",\n    \"inicio\": \"13:00\",\n    \"fim\": \"22:00\",\n    \"dias_trabalho\": [\"ter\", \"qua\", \"qui\", \"sex\", \"dom\"],\n    \"folga\": [\"sáb\", \"seg\"]\n  },\n  {\n    \"agente\": \"Agente_2\",\n    \"inicio\": \"17:00\",\n    \"fim\": \"02:00\",\n    \"dias_trabalho\": [\"ter\", \"qua\", \"qui\", \"sex\", \"sáb\"],\n    \"folga\": [\"dom\", \"seg\"]\n  },\n  {\n    \"agente\": \"Agente_3\",\n    \"inicio\": \"15:00\",\n    \"fim\": \"00:00\",\n    \"dias_trabalho\": [\"dom\", \"seg\", \"qua\", \"qui\", \"sex\"],\n    \"folga\": [\"sáb\", \"ter\"]\n  },\n  {\n    \"agente\": \"Agente_4\",\n    \"inicio\": \"12:00\",\n    \"fim\": \"21:00\",\n    \"dias_trabalho\": [\"dom\", \"seg\", \"qua\", \"qui\", \"sex\"],\n    \"folga\": [\"sáb\", \"ter\"]\n  }\n]"
+      },
+      "id": "217661db-ad15-4fce-98e8-0deb0d82b8bd",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [-40224, 18176]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-39216, 18016],
+      "id": "c5424e39-159e-4131-9c11-7ec017b9bced",
+      "name": "Merge5"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "capacity_whatsapp, capacity_webchat",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-38880, 18016],
+      "id": "d2d29126-6755-4b00-bb7f-ce18206c3fc1",
+      "name": "Split Out3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Código para n8n - Calcular capacidade de atendimento por canal\n// Multiplica quantidade de agentes pela capacidade média do time\n\n// Recebe o input do n8n\nconst inputData = $input.all();\n\n// Extrai os dados do JSON\nconst allItems = inputData.map(item => item.json);\n\n// Separa os dados de escala (linhas com row_number) dos dados de capacidade\nconst scheduleData = [];\nconst capacityData = {};\n\nfor (const item of allItems) {\n  if ('row_number' in item) {\n    scheduleData.push(item);\n  } else if ('capacity_webchat_segunda' in item) {\n    capacityData['segunda'] = {\n      webchat: item.capacity_webchat_segunda,\n      whatsapp: item.capacity_whatsapp_segunda\n    };\n  } else if ('capacity_webchat_terca' in item) {\n    capacityData['terca'] = {\n      webchat: item.capacity_webchat_terca,\n      whatsapp: item.capacity_whatsapp_terca\n    };\n  } else if ('capacity_webchat_quarta' in item) {\n    capacityData['quarta'] = {\n      webchat: item.capacity_webchat_quarta,\n      whatsapp: item.capacity_whatsapp_quarta\n    };\n  } else if ('capacity_webchat_quinta' in item) {\n    capacityData['quinta'] = {\n      webchat: item.capacity_webchat_quinta,\n      whatsapp: item.capacity_whatsapp_quinta\n    };\n  } else if ('capacity_webchat_sexta' in item) {\n    capacityData['sexta'] = {\n      webchat: item.capacity_webchat_sexta,\n      whatsapp: item.capacity_whatsapp_sexta\n    };\n  } else if ('capacity_webchat_sabado' in item) {\n    capacityData['sabado'] = {\n      webchat: item.capacity_webchat_sabado,\n      whatsapp: item.capacity_whatsapp_sabado\n    };\n  } else if ('capacity_webchat_domngo' in item) {  // Nota: typo no original \"domngo\"\n    capacityData['domingo'] = {\n      webchat: item.capacity_webchat_domngo,\n      whatsapp: item.capacity_whatsapp_domingo\n    };\n  }\n}\n\n// Mapeamento das colunas para os dias da semana\nconst dayMapping = {\n  'SEG': 'segunda',\n  'TER': 'terca',\n  'QUA': 'quarta',\n  'QUI': 'quinta',\n  'SEX': 'sexta',\n  'SABADO': 'sabado',\n  'DOMINGO': 'domingo'\n};\n\n// Gera as tabelas de capacidade\nconst capacityWebchat = [];\nconst capacityWhatsapp = [];\n\nfor (const row of scheduleData) {\n  const webchatRow = {\n    row_number: row.row_number,\n    HORA: row.HORA\n  };\n  const whatsappRow = {\n    row_number: row.row_number,\n    HORA: row.HORA\n  };\n  \n  for (const [col, dayKey] of Object.entries(dayMapping)) {\n    if (col in row && dayKey in capacityData) {\n      const agents = row[col];\n      \n      // Calcula capacidade webchat (arredonda para 2 casas decimais)\n      const webchatCapacity = Math.round(agents * capacityData[dayKey].webchat * 100) / 100;\n      webchatRow[col] = webchatCapacity;\n      \n      // Calcula capacidade whatsapp (arredonda para 2 casas decimais)\n      const whatsappCapacity = Math.round(agents * capacityData[dayKey].whatsapp * 100) / 100;\n      whatsappRow[col] = whatsappCapacity;\n    }\n  }\n  \n  capacityWebchat.push(webchatRow);\n  capacityWhatsapp.push(whatsappRow);\n}\n\n// Retorna os resultados no formato n8n\n// Retorna um único objeto com as duas tabelas separadas\nreturn [{\n  json: {\n    capacity_webchat: capacityWebchat,\n    capacity_whatsapp: capacityWhatsapp\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-39072, 18016],
+      "id": "02d2150b-4a9d-49d2-9f66-4efb57fdda67",
+      "name": "Calculo do Capacity"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mapeia todos os itens recebidos para o formato de matriz (lista de listas)\nconst values = items.map(item => {\n  // Acessa o objeto especifico (ajuste se vier de capacity_whatsapp ou outro)\n  const dado = item.json.capacity_whatsapp; \n  \n  // Retorna a ordem exata das colunas K, L, M, N, O, P, Q\n  return [\n    dado.SEG,\n    dado.TER,\n    dado.QUA,\n    dado.QUI,\n    dado.SEX,\n    dado.SABADO,\n    dado.DOMINGO\n  ];\n});\n\n// Retorna um único item com a estrutura que a API do Google exige\nreturn {\n  json: {\n    values: values\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-38672, 18016],
+      "id": "ab963fcb-a24a-438a-805b-6361afdb943e",
+      "name": "Code in JavaScript19"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-39680, 17632],
+      "id": "eab77a77-f05b-42f5-8224-978055d5e7ba",
+      "name": "Merge7",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transforma os 138 itens separados em uma única matriz para o Google Sheets\nconst values = items.map(item => {\n  const linha = item.json;\n  // Retorna na ordem exata das colunas da planilha (B, C, D, E, F, G, H)\n  return [\n    linha.SEG, \n    linha.TER, \n    linha.QUA, \n    linha.QUI, \n    linha.SEX, \n    linha.SABADO, // Nota: use aspas/colchetes se tiver acento\n    linha.DOMINGO\n  ];\n});\n\n// Retorna apenas 1 item contendo toda a matriz\nreturn {\n  json: {\n    values: values\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-38992, 17632],
+      "id": "6c1613d3-74ff-447f-82da-9b73e4ed41c2",
+      "name": "Code in JavaScript21"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-38496, 17632],
+      "id": "fed3f514-90ba-4480-8c98-245101538258",
+      "name": "Wait1",
+      "webhookId": "63586188-73d5-4838-be4d-b161a619753c"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0",
+          "mode": "list",
+          "cachedResultName": "Cópia de Escala e Previsão - Maio/2026",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2056273156,
+          "mode": "list",
+          "cachedResultName": "QUERY - agentes_prova_real",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0/edit#gid=2056273156"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-39504, 18000],
+      "id": "eac199c2-aced-47fb-b1d5-d96cc4d9724a",
+      "name": "Quantidade de Agentes prova real",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/19G8C8lf6q2-ihC6JLGPbb1u7KN2giCO5rFuiKvLCupQ/values/Prova Real-Contratações-Maio-Whatsapp!K2:Q140 ",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueInputOption",
+              "value": "USER_ENTERED"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"values\": $json.values\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-38464, 18016],
+      "id": "9133a93d-801a-482b-a06a-e12d861c3ea5",
+      "name": "Atualizar o capacity dos agentes no webchat_prova_real",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// =============================================================\n// Acrescenta os novos agentes à escala\n// Equivalente JS do input_agents_10_min.py\n// =============================================================\n\n// 1. RECEBER OS DADOS\nconst allItems = $input.all();\n\nif (!allItems || allItems.length === 0) {\n  throw new Error(\"Nenhum item recebido. Verifique a conexão do nó anterior.\");\n}\n\n// Separar items: linhas da escala vs output da IA\nconst schedule = [];\nlet agentsOutput = null;\n\nfor (const item of allItems) {\n  const json = item.json;\n  if ('SEG' in json && 'row_number' in json) {\n    schedule.push({ ...json });\n  } else if ('output' in json) {\n    agentsOutput = json.output;\n  }\n}\n\nif (schedule.length === 0) {\n  throw new Error(\n    \"Nenhuma linha de escala encontrada.\\n\" +\n    \"Campos do primeiro item: [\" + Object.keys(allItems[0].json).join(', ') + \"]\"\n  );\n}\n\nif (!agentsOutput) {\n  throw new Error(\n    \"Output da IA não encontrado.\\n\" +\n    \"Total de items: \" + allItems.length\n  );\n}\n\n// 2. GERAR HORA (grid de 10min a partir de 07:00)\n// row_number 2 = 07:00, row_number 3 = 07:10, etc.\nfor (const row of schedule) {\n  if (!row.HORA) {\n    const minutesFromStart = (row.row_number - 2) * 10;\n    const totalMinutes = (7 * 60) + minutesFromStart;\n    const h = Math.floor(totalMinutes / 60) % 24;\n    const m = totalMinutes % 60;\n    row.HORA = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');\n  }\n}\n\n// 3. PARSE DOS AGENTES (suporta Array OU string Python)\nlet agents = [];\n\nif (Array.isArray(agentsOutput)) {\n  // Formato do Structured Output Parser\n  agents = agentsOutput.map(ag => ({\n    name: ag.agente,\n    start: ag.inicio,\n    end: ag.fim,\n    days: ag.dias_trabalho\n  }));\n} else {\n  // Formato string Python: \"Agente_1\": (\"09:00\", \"18:00\", [\"seg\", \"ter\"])\n  const outputStr = String(agentsOutput);\n  const lines = outputStr.split('\\n');\n  \n  for (const line of lines) {\n    const trimmed = line.trim();\n    // Procura linhas que contêm o padrão de agente\n    if (trimmed.includes('Agente_') && trimmed.includes('(') && trimmed.includes('[')) {\n      try {\n        // Extrair nome do agente\n        const nameMatch = trimmed.match(/\"([^\"]+)\"/);\n        if (!nameMatch) continue;\n        const name = nameMatch[1];\n        \n        // Extrair conteúdo entre parênteses: (\"09:00\", \"18:00\", [\"seg\", \"ter\"])\n        const parenStart = trimmed.indexOf('(');\n        const parenEnd = trimmed.lastIndexOf(')');\n        if (parenStart === -1 || parenEnd === -1) continue;\n        const inner = trimmed.substring(parenStart + 1, parenEnd);\n        \n        // Extrair os dois horários (primeiras duas strings entre aspas após o parêntese)\n        const timeMatches = inner.match(/\"(\\d{2}:\\d{2})\"/g);\n        if (!timeMatches || timeMatches.length < 2) continue;\n        const start = timeMatches[0].replace(/\"/g, '');\n        const end = timeMatches[1].replace(/\"/g, '');\n        \n        // Extrair array de dias entre colchetes\n        const bracketStart = inner.indexOf('[');\n        const bracketEnd = inner.indexOf(']');\n        if (bracketStart === -1 || bracketEnd === -1) continue;\n        const daysStr = inner.substring(bracketStart + 1, bracketEnd);\n        const days = daysStr.split(',').map(d => d.trim().replace(/\"/g, '').replace(/'/g, ''));\n        \n        agents.push({ name, start, end, days });\n      } catch (e) {\n        // Se falhar o parse de uma linha, pula para a próxima\n        continue;\n      }\n    }\n  }\n}\n\nif (agents.length === 0) {\n  throw new Error(\n    \"Nenhum agente encontrado no output da IA.\\n\" +\n    \"Primeiros 300 chars: \" + String(agentsOutput).substring(0, 300)\n  );\n}\n\n// 4. MAPEAMENTO DE DIAS (IA usa minúsculo com acento → planilha usa maiúsculo)\nconst dayMap = {\n  'seg': 'SEG', 'ter': 'TER', 'qua': 'QUA', 'qui': 'QUI',\n  'sex': 'SEX', 'sáb': 'SABADO', 'sab': 'SABADO',\n  'dom': 'DOMINGO'\n};\n\n// 5. ADICIONAR AGENTES À ESCALA (lógica do input_agents_10_min.py)\n// Equivalente a: df_schedule.loc[(hora >= start) & (hora <= end), day] += 1\nfor (const agent of agents) {\n  for (const day of agent.days) {\n    const col = dayMap[day.trim().toLowerCase()] || day.trim();\n    \n    for (const row of schedule) {\n      if (row[col] !== undefined && row.HORA) {\n        // Comparação de horário: suporta agentes que cruzam meia-noite\n        // Ex: start=\"19:00\", end=\"04:00\" → trabalha de 19h até 00:00\n        // Mas o horário máximo da escala é 00:00, então tratamos normalmente\n        if (agent.start <= agent.end) {\n          // Turno normal (ex: 07:00 a 16:00)\n          if (row.HORA >= agent.start && row.HORA <= agent.end) {\n            row[col] += 1;\n          }\n        } else {\n          // Turno que cruza meia-noite (ex: 19:00 a 04:00)\n          // Na escala (07:00-00:00), pega de 19:00 até 00:00\n          if (row.HORA >= agent.start || row.HORA <= agent.end) {\n            row[col] += 1;\n          }\n        }\n      }\n    }\n  }\n}\n\n// 6. RETORNAR A ESCALA ATUALIZADA\nreturn schedule;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-39184, 17632],
+      "id": "df3323a4-7f34-4188-84bf-4f6c2ae5ff09",
+      "name": "Acrescenta os novos agentes5"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/1GR2MLkAyQvbLc_CSevpHeeCtLGT_5FhsafbCnz66Bq0/values/QUERY - agentes_prova_real!B2:H140",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueInputOption",
+              "value": "USER_ENTERED"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"values\": $json.values\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-38768, 17632],
+      "id": "df53ff4d-3d3d-4c14-8bb7-6dda6f4f2cdb",
+      "name": "Atualizar o capacity dos Agentes prova real",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wb37PiDavRLi4v29",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6gJcSBK5Rfq0LBMd",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/6gJcSBK5Rfq0LBMd",
+          "cachedResultName": "Prova Real Dimensionamento"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [-39440, 17504],
+      "id": "105fe5be-23ee-4536-9263-4d6b39b2682d",
+      "name": "Call 'Prova Real Dimensionamento'"
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-v4-flash",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [-40368, 18176],
+      "id": "8d67612e-8b27-4110-9f2c-3643738398fa",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "xg8kChvrUsLepfcu",
+          "name": "OpenRouter account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "domingo",
+              "field2": "agent_name"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-44128, 18400],
+      "id": "b693ce9c-c121-4dfc-b1f4-d4d4cdd9570e",
+      "name": "Domingo"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-38208, 18016],
+      "id": "9e75b4d3-d391-471a-ab52-23bd322df245",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.2-pro",
+          "mode": "list",
+          "cachedResultName": "gpt-5.2-pro"
+        },
+        "builtInTools": {},
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [-40528, 18128],
+      "id": "f698bf1a-e7db-4896-aeee-251c48198a9d",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "pT5PkG5T4AE0Rbht",
+          "name": "OpenAi account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "request-agents1": {
+      "main": [
+        [
+          {
+            "node": "Filtrar apenas agentes do suporte1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Norm. Dados necessários1": {
+      "main": [
+        [
+          {
+            "node": "Merge16",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Filtrar apenas agentes do suporte1": {
+      "main": [
+        [
+          {
+            "node": "Norm. Dados necessários1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config_Dates4": {
+      "main": [
+        [
+          {
+            "node": "Merge16",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge16": {
+      "main": [
+        [
+          {
+            "node": "request_agent_conversation_count",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge17",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "request_agent_conversation_count": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge17": {
+      "main": [
+        [
+          {
+            "node": "Escala Pretendida",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "QUARTA",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Segunda",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "TERÇA",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "QUINTA",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "SEXTA",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "SABADO",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Domingo",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "request-agents1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Config_Dates4",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Quantidade de Agentes pro Webchat",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create a page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escala Pretendida": {
+      "main": [
+        [
+          {
+            "node": "QUARTA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Segunda",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TERÇA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "QUINTA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SEXTA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SABADO",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Domingo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Segunda": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript11": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript12": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript13": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript14": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript15": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript16",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript16": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TERÇA": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QUARTA": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Edit Fields4": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Edit Fields5": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Edit Fields6": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Edit Fields7": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Edit Fields8": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "QUINTA": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SEXTA": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SABADO": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Merge5",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Quantidade de Agentes para o Whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quantidade de Agentes pro Webchat": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge7",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Quantidade de Agentes para o Whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Calculo do Capacity1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculo do Capacity1": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Merge17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Atualizar o capacity dos agentes no whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Atualizar o capacity dos agentes no webchat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar o capacity dos agentes no webchat": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar o capacity dos agentes no whatsapp": {
+      "main": [
+        [
+          {
+            "node": "Verifica a quantidade de agentes que faltam por horário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifica a quantidade de agentes que faltam por horário": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a page": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript18",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append a block": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript17": {
+      "main": [
+        [
+          {
+            "node": "Prompt para o agente1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript18": {
+      "main": [
+        [
+          {
+            "node": "Merge7",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Out2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append a block",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prompt para o agente1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [[]]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [[]]
+    },
+    "Merge5": {
+      "main": [
+        [
+          {
+            "node": "Calculo do Capacity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript19",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculo do Capacity": {
+      "main": [
+        [
+          {
+            "node": "Split Out3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript19": {
+      "main": [
+        [
+          {
+            "node": "Atualizar o capacity dos agentes no webchat_prova_real",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge7": {
+      "main": [
+        [
+          {
+            "node": "Acrescenta os novos agentes5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript21": {
+      "main": [
+        [
+          {
+            "node": "Atualizar o capacity dos Agentes prova real",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Quantidade de Agentes prova real",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quantidade de Agentes prova real": {
+      "main": [
+        [
+          {
+            "node": "Merge5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar o capacity dos agentes no webchat_prova_real": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acrescenta os novos agentes5": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript21",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar o capacity dos Agentes prova real": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Domingo": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "When clicking 'Execute workflow'": [{}]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "139ef3909d89793a9f40f0e7675455e096807386e4764f1577a795f19bc32be6"
+  }
+}

@@ -1,0 +1,20 @@
+**Análise e Resultado**
+
+Com base na tabela de defasagem, identifiquei que os déficits de agentes se concentram em três grandes blocos:  
+- **Manhã** (07:00–10:00): com destaque para segunda (07:30–10:00), terça (07:00–10:00), e em menor escala quarta, quinta, sexta, sábado e domingo.  
+- **Entardecer/Noite** (17:00–00:00): fortíssimo nas segundas e domingos (17:00–21:00) e em todos os dias entre 22:00 e 00:00, com picos em segunda, terça, sábado e domingo.  
+- **Madrugada** (00:00–09:00): presente em todos os dias, especialmente nos primeiros horários pós‑meia‑noite e nas primeiras horas da manhã de terça e sábado.
+
+Após simular todas as combinações de turnos (respeitando jornada 8h + 1h almoço, entrada e saída em hora cheia, término máximo às 00:00) e dos dias de trabalho (5×2, folgas no intervalo sábado‑terça, nunca sábado e domingo consecutivos), a melhor cobertura com 4 agentes é obtida com a seguinte escala, priorizada pela quantidade de slots com déficit cobertos por cada agente isoladamente:
+
+```python
+agents = {
+    "Agente_1": ("15:00", "00:00", ["seg", "qua", "qui", "sex", "dom"]),
+    "Agente_2": ("15:00", "00:00", ["ter", "qua", "qui", "sex", "sáb"]),
+    "Agente_3": ("00:00", "09:00", ["ter", "qua", "qui", "sex", "sáb"]),
+    "Agente_4": ("07:00", "16:00", ["seg", "qua", "qui", "sex", "dom"])
+}
+```
+
+- **Agente_1 (prioridade máxima)**: o turno das 15:00 às 00:00 atinge o maior bloco de déficits, cobrindo as fortes faltas do entardecer/noite nas segundas e domingos, além de cobrir quarta a sexta no período noturno. Sozinho ele cobre **85 slots** com defasagem.  
+- **Agente_2 (segunda prioridade)**: mesmo turno 15:00–00:00, mas com dias de trabalho que incluem terça e sábado, suprindo exatamente os déficits noturnos desses dois dias (terça e sábado são dias de alta falta nesse período). Cobre **58 slots** adicionais.  
