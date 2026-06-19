@@ -19,6 +19,9 @@ dist-ssr/
 .tanstack/**
 .nitro/
 
+# Supabase CLI local state (link, shadow DB)
+supabase/.temp/
+
 # Lovable
 .lovable/
 

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as WebchatRouteImport } from './routes/webchat'
+import { Route as PrevisaoEscalaRouteImport } from './routes/previsao-escala'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as EscalaRouteImport } from './routes/escala'
 import { Route as ContratacoesRouteImport } from './routes/contratacoes'
@@ -21,32 +22,39 @@ const WhatsappRoute = WhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/whatsapp.lazy').then((d) => d.Route))
 const WebchatRoute = WebchatRouteImport.update({
   id: '/webchat',
   path: '/webchat',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/webchat.lazy').then((d) => d.Route))
+const PrevisaoEscalaRoute = PrevisaoEscalaRouteImport.update({
+  id: '/previsao-escala',
+  path: '/previsao-escala',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/previsao-escala.lazy').then((d) => d.Route),
+)
 const PainelRoute = PainelRouteImport.update({
   id: '/painel',
   path: '/painel',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/painel.lazy').then((d) => d.Route))
 const EscalaRoute = EscalaRouteImport.update({
   id: '/escala',
   path: '/escala',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/escala.lazy').then((d) => d.Route))
 const ContratacoesRoute = ContratacoesRouteImport.update({
   id: '/contratacoes',
   path: '/contratacoes',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/contratacoes.lazy').then((d) => d.Route))
 const CapacidadeRoute = CapacidadeRouteImport.update({
   id: '/capacidade',
   path: '/capacidade',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/capacidade.lazy').then((d) => d.Route))
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -59,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
   '/painel': typeof PainelRoute
+  '/previsao-escala': typeof PrevisaoEscalaRoute
   '/webchat': typeof WebchatRoute
   '/whatsapp': typeof WhatsappRoute
 }
@@ -68,6 +77,7 @@ export interface FileRoutesByTo {
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
   '/painel': typeof PainelRoute
+  '/previsao-escala': typeof PrevisaoEscalaRoute
   '/webchat': typeof WebchatRoute
   '/whatsapp': typeof WhatsappRoute
 }
@@ -78,6 +88,7 @@ export interface FileRoutesById {
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
   '/painel': typeof PainelRoute
+  '/previsao-escala': typeof PrevisaoEscalaRoute
   '/webchat': typeof WebchatRoute
   '/whatsapp': typeof WhatsappRoute
 }
@@ -89,6 +100,7 @@ export interface FileRouteTypes {
     | '/contratacoes'
     | '/escala'
     | '/painel'
+    | '/previsao-escala'
     | '/webchat'
     | '/whatsapp'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +110,7 @@ export interface FileRouteTypes {
     | '/contratacoes'
     | '/escala'
     | '/painel'
+    | '/previsao-escala'
     | '/webchat'
     | '/whatsapp'
   id:
@@ -107,6 +120,7 @@ export interface FileRouteTypes {
     | '/contratacoes'
     | '/escala'
     | '/painel'
+    | '/previsao-escala'
     | '/webchat'
     | '/whatsapp'
   fileRoutesById: FileRoutesById
@@ -117,6 +131,7 @@ export interface RootRouteChildren {
   ContratacoesRoute: typeof ContratacoesRoute
   EscalaRoute: typeof EscalaRoute
   PainelRoute: typeof PainelRoute
+  PrevisaoEscalaRoute: typeof PrevisaoEscalaRoute
   WebchatRoute: typeof WebchatRoute
   WhatsappRoute: typeof WhatsappRoute
 }
@@ -135,6 +150,13 @@ declare module '@tanstack/react-router' {
       path: '/webchat'
       fullPath: '/webchat'
       preLoaderRoute: typeof WebchatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/previsao-escala': {
+      id: '/previsao-escala'
+      path: '/previsao-escala'
+      fullPath: '/previsao-escala'
+      preLoaderRoute: typeof PrevisaoEscalaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel': {
@@ -181,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContratacoesRoute: ContratacoesRoute,
   EscalaRoute: EscalaRoute,
   PainelRoute: PainelRoute,
+  PrevisaoEscalaRoute: PrevisaoEscalaRoute,
   WebchatRoute: WebchatRoute,
   WhatsappRoute: WhatsappRoute,
 }

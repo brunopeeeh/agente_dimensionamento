@@ -1,20 +1,18 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useDimensionamento, DAYS, Day } from "@/context/DimensionamentoContext";
-import {
-  AlertTriangle,
-  Clock,
-  HelpCircle,
-  CheckCircle,
-  Sparkles,
-  Send,
-  Copy,
-  Check,
-} from "lucide-react";
+import { AlertTriangle, Clock, HelpCircle, CheckCircle, Sparkles, Copy, Check } from "lucide-react";
+
+const getHeatmapBg = (deficit: number) => {
+  if (deficit <= 0)
+    return "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border-emerald-500/20";
+  if (deficit === 1)
+    return "bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 border-amber-500/30";
+  if (deficit === 2) return "bg-rose-500/35 hover:bg-rose-500/45 text-rose-500 border-rose-500/40";
+  return "bg-red-500/60 hover:bg-red-500/70 text-red-100 border-red-500/60 font-bold";
+};
 
 export function HeatmapEscala() {
-  const { rowCalculations, tmaFactors, simultaneousWA, simultaneousWC } = useDimensionamento();
-  const [selectedDay, setSelectedDay] = useState<Day>("Segunda");
+  const { rowCalculations } = useDimensionamento();
   const [hoveredCell, setHoveredCell] = useState<{
     day: Day;
     hour: string;
@@ -42,7 +40,10 @@ export function HeatmapEscala() {
     > = {};
 
     hours.forEach((h) => {
-      grid[h] = {} as any;
+      grid[h] = {} as Record<
+        Day,
+        { deficit: number; volume: number; capacity: number; surplus: number }
+      >;
       DAYS.forEach((d) => {
         grid[h][d] = { deficit: 0, volume: 0, capacity: 0, surplus: 0 };
       });
@@ -53,10 +54,10 @@ export function HeatmapEscala() {
       if (!grid[hour]) return;
 
       DAYS.forEach((day, dIdx) => {
-        const vol = (r as any).waVolume[dIdx] ?? 0;
-        const cap = (r as any).waCapacityR[dIdx] ?? 0;
-        const def = (r as any).waFaltam10[dIdx] ?? 0;
-        const sur = (r as any).waResultado[dIdx] ?? 0;
+        const vol = r.waVolume[dIdx] ?? 0;
+        const cap = r.waCapacityR[dIdx] ?? 0;
+        const def = r.waFaltam10[dIdx] ?? 0;
+        const sur = r.waResultado[dIdx] ?? 0;
 
         grid[hour][day].volume += vol;
         grid[hour][day].capacity += cap;
@@ -123,20 +124,14 @@ export function HeatmapEscala() {
     return JSON.stringify(result, null, 2);
   }, []);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(aiScaleSuggestion);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const getHeatmapBg = (deficit: number) => {
-    if (deficit === 0)
-      return "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border-emerald-500/20";
-    if (deficit === 1)
-      return "bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 border-amber-500/30";
-    if (deficit === 2)
-      return "bg-rose-500/35 hover:bg-rose-500/45 text-rose-500 border-rose-500/40";
-    return "bg-red-500/60 hover:bg-red-500/70 text-red-100 border-red-500/60 font-bold";
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(aiScaleSuggestion);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard may be unavailable outside secure contexts.
+    }
   };
 
   return (
@@ -193,19 +188,24 @@ export function HeatmapEscala() {
                   </div>
                   {DAYS.map((d) => {
                     const cell = aggregatedGrid[h]?.[d] || { deficit: 0, volume: 0, capacity: 0 };
+                    const cellInfo = {
+                      day: d,
+                      hour: h,
+                      deficit: cell.deficit,
+                      volume: cell.volume,
+                      capacity: cell.capacity,
+                    };
+                    const cellLabel = `${d} ${h}: ${cell.deficit > 0 ? `déficit ${cell.deficit}` : "OK"}`;
                     return (
                       <div
                         key={d}
-                        onMouseEnter={() =>
-                          setHoveredCell({
-                            day: d,
-                            hour: h,
-                            deficit: cell.deficit,
-                            volume: cell.volume,
-                            capacity: cell.capacity,
-                          })
-                        }
+                        role="gridcell"
+                        tabIndex={0}
+                        aria-label={cellLabel}
+                        onMouseEnter={() => setHoveredCell(cellInfo)}
                         onMouseLeave={() => setHoveredCell(null)}
+                        onFocus={() => setHoveredCell(cellInfo)}
+                        onBlur={() => setHoveredCell(null)}
                         className={`rounded-lg border py-2.5 text-xs font-mono transition-all duration-150 cursor-crosshair border-dashed ${getHeatmapBg(cell.deficit)}`}
                       >
                         {cell.deficit > 0 ? `-${cell.deficit}` : "OK"}
@@ -295,7 +295,9 @@ export function HeatmapEscala() {
           <div className="relative">
             <div className="absolute top-2.5 right-2.5 z-10">
               <button
+                type="button"
                 onClick={handleCopy}
+                aria-label="Copiar sugestões em JSON"
                 className="p-1.5 rounded-md border bg-card text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
                 title="Copiar JSON"
               >

@@ -1,0 +1,5 @@
+# Supabase project config (lido por `npx supabase`).
+# Mantido mínimo: este projeto não usa `supabase start` (stack local).
+# A CLI detecta `supabase/migrations/` automaticamente; nenhum [db] é necessário.
+
+project_id = "odogvzfxzyufknjjqhnr"

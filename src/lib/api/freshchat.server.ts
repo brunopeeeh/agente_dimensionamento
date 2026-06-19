@@ -1,0 +1,317 @@
+import process from "node:process";
+import { matchAgentName } from "@/lib/agents";
+import { handleSyncCapacity } from "./sync-capacity.server";
+
+/**
+ * Server-only module: imports Care support agents from Freshchat and pushes
+ * their 90-day resolved-interaction volume into Supabase.
+ *
+ * Required env: FRESHCHAT_BEARER_TOKEN (no VITE_ prefix — server-only secret).
+ */
+
+const FRESHCHAT_API = "https://api.freshchat.com/v2";
+
+// Group IDs: filter rule is "(RETENTION OR WEBCHAT) - ONBOARDING"
+const RETENTION_GROUP_ID = "3ea40078-55f2-4176-85ee-face7f3d7498";
+const WEBCHAT_GROUP_ID = "6b748002-634a-4ba7-b191-844d123643ed";
+const ONBOARDING_GROUP_ID = "64f40e5f-b18a-4d1d-8c23-1fcb9575c5a7";
+
+// Static synthetic rows appended to every sync. Kept here to preserve
+// backwards-compat with charts that depend on these two names. Both can be
+// edited inline on the /capacidade page once the sync finishes.
+const STATIC_CAPACITY_AGENTS = [
+  { name: "Yooga Suporte", mediaTri: 3634 },
+  { name: "Care AI", mediaTri: 14696 },
+];
+
+// Agent overrides applied after Freshchat sync. Edit here to adjust behavior
+// without redeploying. Case-insensitive matching (lowercase + strip accents).
+//
+//   EXCLUDE_NAMES — agentes reais do Freshchat que NÃO devem aparecer
+//                    na tabela de Capacity.
+//   RENAME_MAP     — agente real do Freshchat cujo nome deve ser exibido
+//                    como outro valor (e.g., consolidar com linha estática).
+//
+// Regras de precedência quando há colisão com STATIC_CAPACITY_AGENTS:
+//   - Real cujo nome JÁ É igual a um estático (sem renomeação) → estático
+//     vence, real é descartado.
+//   - Real que foi RENOMEADO para um nome estático → real vence e SUBSTITUI
+//     o estático (a renomeação indica intenção explícita de usar o real).
+const EXCLUDE_NAMES = ["Maya Santos"];
+const RENAME_MAP: Record<string, string> = {
+  "Yooga Tecnologia": "Care IA",
+};
+
+// Concurrency cap for the volume fetch (per-agent metric requests). Keeps us
+// polite to the Freshchat API.
+const VOLUME_CONCURRENCY = 2;
+
+type FreshchatAgent = {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  groups?: string[];
+  availability_status?: string;
+  skill_id?: string;
+};
+
+export type FreshchatSyncResult = {
+  success: boolean;
+  message: string;
+  month: string;
+  agents_synced: number;
+  agents_added_to_team: string[];
+  agents_removed_from_team: string[];
+  total_team_agents: number;
+  error?: string;
+};
+
+function getBearer(): string {
+  return process.env.FRESHCHAT_BEARER_TOKEN || "";
+}
+
+const lc = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+function isInTargetGroup(groups: string[] | undefined): boolean {
+  if (!groups || !Array.isArray(groups)) return false;
+  return groups.includes(RETENTION_GROUP_ID) || groups.includes(WEBCHAT_GROUP_ID);
+}
+
+function isInOnboarding(groups: string[] | undefined): boolean {
+  if (!groups || !Array.isArray(groups)) return false;
+  return groups.includes(ONBOARDING_GROUP_ID);
+}
+
+/**
+ * Fetches all support agents and returns only those that are in RETENTION or
+ * WEBCHAT and NOT in ONBOARDING.
+ */
+export async function getSupportAgents(): Promise<FreshchatAgent[]> {
+  const bearer = getBearer();
+  if (!bearer) {
+    throw new Error(
+      "FRESHCHAT_BEARER_TOKEN não configurado. Defina a variável no .env do servidor.",
+    );
+  }
+
+  const url = `${FRESHCHAT_API}/agents?page=1&items_per_page=100`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${bearer}`,
+      accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Freshchat /agents retornou ${res.status} ${res.statusText}. Verifique o token.`,
+    );
+  }
+
+  const data = (await res.json()) as { agents?: FreshchatAgent[] };
+  const agents = data.agents || [];
+
+  return agents.filter((a) => isInTargetGroup(a.groups) && !isInOnboarding(a.groups));
+}
+
+/**
+ * Fetches the 90-day resolved-interaction count for each agent, in parallel.
+ * Returns a map of `agentId → totalVolume` (sum of all daily values).
+ */
+export async function getAgentVolumes90Days(agentIds: string[]): Promise<Record<string, number>> {
+  const bearer = getBearer();
+  if (!bearer) {
+    throw new Error("FRESHCHAT_BEARER_TOKEN não configurado no .env do servidor.");
+  }
+  if (agentIds.length === 0) return {};
+
+  // 90-day window: from (today - 90) to today, formatted as yyyy-MM-dd.
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(end.getDate() - 90);
+  const startStr = start.toISOString().slice(0, 10);
+  const endStr = end.toISOString().slice(0, 10);
+
+  const volumes: Record<string, number> = {};
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < agentIds.length) {
+      const id = agentIds[cursor++];
+      let retries = 3;
+      let success = false;
+      let backoffMs = 1500;
+
+      while (retries > 0 && !success) {
+        try {
+          const url = new URL(`${FRESHCHAT_API}/metrics/historical`);
+          url.searchParams.set("metric", "conversation_metrics.resolved_interactions");
+          url.searchParams.set("start", startStr);
+          url.searchParams.set("end", endStr);
+          url.searchParams.set("count_metric", "count");
+          url.searchParams.set("filter_by", `agent=${id}`);
+          url.searchParams.set("group_by", "agent");
+          url.searchParams.set("interval", "1d");
+
+          const res = await fetch(url, {
+            headers: {
+              Authorization: `Bearer ${bearer}`,
+              accept: "application/json",
+            },
+          });
+          
+          if (!res.ok) {
+            if (res.status === 429) {
+              console.warn(`[freshchat] Rate limited (429) for agent ${id}. Retrying in ${backoffMs}ms...`);
+              await new Promise((resolve) => setTimeout(resolve, backoffMs));
+              backoffMs *= 2;
+              retries--;
+              if (retries === 0) volumes[id] = 0;
+              continue;
+            } else {
+              console.warn(`[freshchat] metrics ${res.status} for agent ${id}`);
+              volumes[id] = 0;
+              success = true;
+              continue;
+            }
+          }
+          const data = (await res.json()) as {
+            data?: Array<{ series?: Array<{ values?: Array<{ value: string }> }> }>;
+          };
+
+          let total = 0;
+          for (const entry of data.data || []) {
+            for (const serie of entry.series || []) {
+              for (const v of serie.values || []) {
+                total += parseFloat(v.value) || 0;
+              }
+            }
+          }
+          volumes[id] = total;
+          success = true;
+        } catch (err) {
+          console.warn(`[freshchat] error for agent ${id}:`, err);
+          retries--;
+          if (retries === 0) {
+            volumes[id] = 0;
+          } else {
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            backoffMs *= 2;
+          }
+        }
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(VOLUME_CONCURRENCY, agentIds.length) },
+    (): Promise<void> => worker(),
+  );
+  await Promise.all(workers);
+
+  return volumes;
+}
+
+/**
+ * End-to-end Freshchat → Supabase sync for a given planning month.
+ *
+ *  1. Fetch filtered support agents from Freshchat
+ *  2. Fetch their 90-day resolved-interaction totals
+ *  3. Filter: drop EXCLUDE_NAMES, drop agents not on the schedule
+ *  4. Apply RENAME_MAP (Care IA substitution from Yooga Tecnologia)
+ *  5. Dedupe against STATIC_CAPACITY_AGENTS (per-name precedence rule)
+ *  6. Delegate to handleSyncCapacity() to upsert into escala_equipe
+ */
+export type FreshchatSyncRequest = {
+  month: string;
+  /** Nomes da escala ativa (enviado pelo cliente). Se vazio, todos os
+   *  agentes reais do Freshchat são descartados — apenas as estáticas
+   *  permanecem (regra estrita). */
+  teamAgentNames: string[];
+};
+
+export async function runFreshchatSync(req: FreshchatSyncRequest): Promise<FreshchatSyncResult> {
+  const monthName = req?.month;
+  const teamAgentNames = Array.isArray(req?.teamAgentNames) ? req.teamAgentNames : [];
+
+  if (!monthName || typeof monthName !== "string") {
+    return {
+      success: false,
+      message: "Mês/ano de destino é obrigatório (ex: 'Fevereiro 2026').",
+      month: monthName || "",
+      agents_synced: 0,
+      agents_added_to_team: [],
+      agents_removed_from_team: [],
+      total_team_agents: 0,
+      error: "INVALID_MONTH",
+    };
+  }
+
+  const supportAgents = await getSupportAgents();
+
+  const volumes = await getAgentVolumes90Days(supportAgents.map((a) => a.id));
+
+  const realAgentsProcessed = supportAgents
+    .map((a) => {
+      const fullName = `${a.first_name || ""} ${a.last_name || ""}`.trim() || a.id;
+      const renamed = RENAME_MAP[fullName] ?? RENAME_MAP[lc(fullName)];
+      return {
+        name: renamed ?? fullName,
+        mediaTri: Math.round(volumes[a.id] || 0),
+        wasRenamed: !!renamed,
+      };
+    })
+    .filter((a) => !EXCLUDE_NAMES.includes(a.name) && !EXCLUDE_NAMES.includes(lc(a.name)))
+    // Regra estrita: se nenhum nome da escala foi enviado, TODOS os reais
+    // são descartados — apenas as estáticas (Yooga Suporte + Care IA) sobrevivem.
+    .filter((a) => teamAgentNames.some((t) => matchAgentName(a.name, t)));
+
+  const staticNamesLc = new Set(STATIC_CAPACITY_AGENTS.map((s) => lc(s.name)));
+  const realRenamedNamesLc = new Set(
+    realAgentsProcessed.filter((a) => a.wasRenamed).map((a) => lc(a.name)),
+  );
+
+  // Real "natural" casando com estático → descartado (estático vence).
+  // Real RENOMEADO para nome de estático → mantido, substitui o estático.
+  const realKept = realAgentsProcessed
+    .filter((a) => !(staticNamesLc.has(lc(a.name)) && !a.wasRenamed))
+    .map(({ name, mediaTri }) => ({ name, mediaTri }));
+
+  // Estáticas que NÃO foram sobrescritas por uma renomeação real permanecem.
+  const capacity_agents = [
+    ...realKept,
+    ...STATIC_CAPACITY_AGENTS.filter((s) => !realRenamedNamesLc.has(lc(s.name))),
+  ];
+
+  const result = await handleSyncCapacity({ capacity_agents, month: monthName });
+
+  if (result.status !== 200 || result.data.success === false) {
+    const errorMsg =
+      result.data.success === false ? result.data.error : "Falha desconhecida no sync.";
+    return {
+      success: false,
+      message: `Sincronização falhou: ${errorMsg}`,
+      month: monthName,
+      agents_synced: 0,
+      agents_added_to_team: [],
+      agents_removed_from_team: [],
+      total_team_agents: 0,
+      error: errorMsg,
+    };
+  }
+
+  return {
+    success: true,
+    message: `Sincronização concluída: ${capacity_agents.length} agentes atualizados em "${monthName}".`,
+    month: monthName,
+    agents_synced: capacity_agents.length,
+    agents_added_to_team: result.data.agents_added_to_team,
+    agents_removed_from_team: result.data.agents_removed_from_team,
+    total_team_agents: result.data.total_team_agents,
+  };
+}

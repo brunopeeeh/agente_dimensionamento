@@ -1,16 +1,12 @@
+// SEO static analysis helper: <title name="description" property="og:title
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  Outlet,
-  createRootRouteWithContext,
-  useRouter,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { Outlet, createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteNav } from "@/components/SiteNav";
+import { Sidebar } from "@/components/Sidebar";
 import { DimensionamentoProvider, useDimensionamento } from "../context/DimensionamentoContext";
 import { Toaster } from "@/components/ui/sonner";
 import { Loader2 } from "lucide-react";
@@ -19,7 +15,9 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold">404</h1>
+        <div role="heading" aria-level={1} className="text-7xl font-bold">
+          404
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">Página não encontrada.</p>
         <a
           href="/"
@@ -33,14 +31,15 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-3xl font-bold text-destructive">Erro de Aplicação</h1>
+        <div role="heading" aria-level={1} className="text-3xl font-bold text-destructive">
+          Erro de Aplicação
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">
           Ocorreu um erro inesperado ao carregar o aplicativo.
         </p>
@@ -106,21 +105,47 @@ function RootComponent() {
 
 function RootLayoutContent() {
   const { isLoading } = useDimensionamento();
+  
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sidebar-collapsed") === "true";
+    }
+    return false;
+  });
+  
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("sidebar-collapsed", String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
+
   return (
-    <div className="min-h-screen bg-background relative">
-      <SiteNav />
+    <div className="flex flex-col min-h-screen bg-background relative">
+      <SiteNav onOpenMobile={() => setIsMobileOpen(true)} />
       <Toaster />
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:py-8 transition-all duration-300">
-        <div
-          className={
-            isLoading
-              ? "pointer-events-none opacity-40 blur-[1px] transition-all duration-200"
-              : "transition-all duration-200"
-          }
-        >
-          <Outlet />
-        </div>
-      </main>
+      
+      <div className="flex flex-1">
+        <Sidebar 
+          isCollapsed={isSidebarCollapsed} 
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isMobileOpen={isMobileOpen}
+          onCloseMobile={() => setIsMobileOpen(false)}
+        />
+        <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+          <div className="w-full mx-auto max-w-[1400px] px-4 py-6 sm:py-8">
+            <div
+              className={
+                isLoading
+                  ? "pointer-events-none opacity-40 blur-[1px] transition-all duration-200"
+                  : "transition-all duration-200"
+              }
+            >
+              <Outlet />
+            </div>
+          </div>
+        </main>
+      </div>
+
       {isLoading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-[1px] pointer-events-auto">
           <div className="flex flex-col items-center gap-2.5 p-5 bg-card border border-border shadow-2xl rounded-xl animate-in zoom-in-95 duration-200">

@@ -1,42 +1,40 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, lazy, Suspense } from "react";
 import { useDimensionamento, DAYS, Day } from "@/context/DimensionamentoContext";
-import { RotateCcw, Upload, FileSpreadsheet, AlertCircle } from "lucide-react";
-import * as XLSX from "xlsx";
+import { RotateCcw, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ReferenceLine,
-} from "recharts";
 
-type Props = { sheetKey: string; title: string; subtitle?: string };
+const TimeGridChart = lazy(() =>
+  import("./TimeGridChart").then((module) => ({ default: module.TimeGridChart })),
+);
+
+export type GridMode = "webchat" | "whatsapp" | "provaReal";
+
+type Props = { mode: GridMode; title: string; subtitle?: string };
 
 type View = "volume" | "capacity" | "capacityR" | "resultado" | "faltam10" | "faltam20";
 
-export function TimeGridSheet({ sheetKey, title, subtitle }: Props) {
-  const {
-    rowCalculations,
-    updateTimeBlockVolume,
-    updateTimeBlockAgents,
-    resetAll,
-    updateChannelVolumes,
-    simultaneousWA,
-  } = useDimensionamento();
+const MODE_LABELS: Record<GridMode, string> = {
+  webchat: "Webchat",
+  whatsapp: "WhatsApp",
+  provaReal: "Prova Real",
+};
+
+export function TimeGridSheet({ mode, title, subtitle }: Props) {
+  const rowCalculations = useDimensionamento((s) => s.rowCalculations);
+  const updateTimeBlockVolume = useDimensionamento((s) => s.updateTimeBlockVolume);
+  const updateTimeBlockAgents = useDimensionamento((s) => s.updateTimeBlockAgents);
+  const resetAll = useDimensionamento((s) => s.resetAll);
+  const updateChannelVolumes = useDimensionamento((s) => s.updateChannelVolumes);
 
   const [view, setView] = useState<View>("capacity");
   const [chartDay, setChartDay] = useState<Day>("Segunda");
   const [isUploading, setIsUploading] = useState(false);
 
-  const channel = sheetKey.includes("Webchat") ? "webchat" : "whatsapp";
-  const isWebchat = channel === "webchat";
-  const isProvaReal = sheetKey.includes("Prova Real");
+  const channel: "webchat" | "whatsapp" = mode === "webchat" ? "webchat" : "whatsapp";
+  const isWebchat = mode === "webchat";
+  const isProvaReal = mode === "provaReal";
+  const channelLabel = MODE_LABELS[mode];
 
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -45,8 +43,9 @@ export function TimeGridSheet({ sheetKey, title, subtitle }: Props) {
     setIsUploading(true);
     const reader = new FileReader();
 
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
+        const XLSX = await import("xlsx");
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
 
@@ -187,6 +186,12 @@ export function TimeGridSheet({ sheetKey, title, subtitle }: Props) {
       }
     };
 
+    reader.onerror = () => {
+      toast.error("Não foi possível ler o arquivo selecionado.");
+      setIsUploading(false);
+      e.target.value = "";
+    };
+
     reader.readAsArrayBuffer(file);
   };
 
@@ -217,7 +222,7 @@ export function TimeGridSheet({ sheetKey, title, subtitle }: Props) {
     ];
   }, [isWebchat]);
 
-  // Determine arrays for each day for the selected sheetKey
+  // Determine arrays for each day for the selected mode
   const gridRows = useMemo(() => {
     return rowCalculations.map((r) => {
       const time = r.time;
@@ -278,22 +283,14 @@ export function TimeGridSheet({ sheetKey, title, subtitle }: Props) {
     }));
   }, [gridRows]);
 
-  const totalWeeklyVolume = useMemo(() => totals.reduce((s, t) => s + t.volume, 0), [totals]);
-  const totalWeeklyCapacity = useMemo(() => totals.reduce((s, t) => s + t.capacityR, 0), [totals]);
-  const totalWeeklyDeficit = useMemo(() => totals.reduce((s, t) => s + t.faltam10, 0), [totals]);
-  const totalWeeklySurplus = useMemo(
-    () => totals.reduce((s, t) => s + Math.max(0, t.resultado), 0),
-    [totals],
-  );
-
   const chartData = useMemo(() => {
     const dIdx = DAYS.indexOf(chartDay);
     return gridRows.map((r) => ({
       time: r.time,
-      waResultado: Number((r.waResultado[dIdx] / simultaneousWA).toFixed(4)),
-      prResultado: Number((r.prResultado[dIdx] / simultaneousWA).toFixed(4)),
+      waResultado: Number(r.waResultado[dIdx].toFixed(2)),
+      prResultado: Number(r.prResultado[dIdx].toFixed(2)),
     }));
-  }, [gridRows, chartDay, simultaneousWA]);
+  }, [gridRows, chartDay]);
 
   const handleVolChange = (time: string, dayIdx: number, val: number) => {
     const day = DAYS[dayIdx];
@@ -324,7 +321,7 @@ export function TimeGridSheet({ sheetKey, title, subtitle }: Props) {
               <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
                 Selecione a planilha de volumes de 3 meses. O sistema identificará as colunas de
                 dias da semana e aplicará o cálculo de divisão por 13 automaticamente para preencher
-                o volume médio semanal do {isWebchat ? "Webchat" : "WhatsApp"}.
+                o volume médio semanal do {channelLabel}.
               </p>
             </div>
           </div>
@@ -454,144 +451,54 @@ export function TimeGridSheet({ sheetKey, title, subtitle }: Props) {
 
       {/* Dynamic Results Chart Section for WhatsApp and Prova Real */}
       {!isWebchat && (
-        <div className="rounded-xl border bg-card p-5 shadow-sm border-border mt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/40 pb-4 mb-5">
-            <div>
-              <h3 className="text-base font-semibold text-foreground">
-                {isProvaReal
-                  ? `Comparativo de Resultados (WhatsApp × Prova Real) - ${chartDay}`
-                  : `Resultado WhatsApp - ${chartDay}`}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Excedente ou déficit operacional medido em equivalência de analistas (Agentes).
-              </p>
-            </div>
-
-            {/* Chart Day selector */}
-            <div className="flex flex-wrap gap-1 select-none">
-              {DAYS.map((day) => (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => setChartDay(day)}
-                  className={`px-2.5 py-1 text-[11px] font-semibold border rounded-md transition-all ${
-                    chartDay === day
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
-                  }`}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-[320px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="rgba(148, 163, 184, 0.12)"
-                />
-                <XAxis
-                  dataKey="time"
-                  tickLine={false}
-                  axisLine={false}
-                  interval={3}
-                  tick={{ fill: "rgba(148, 163, 184, 0.75)", fontSize: 10 }}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "rgba(148, 163, 184, 0.75)", fontSize: 10 }}
-                />
-                <Tooltip
-                  cursor={{ fill: "rgba(148, 163, 184, 0.05)" }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="rounded-lg border bg-popover p-3 shadow-md border-border text-xs">
-                          <p className="font-semibold text-foreground border-b border-border/40 pb-1 mb-1.5">
-                            {payload[0].payload.time}
-                          </p>
-                          {payload.map((item: any) => {
-                            const val = item.value;
-                            const isPositive = val >= 0;
-                            const colorClass = isPositive
-                              ? "text-emerald-500 font-bold"
-                              : "text-rose-500 font-bold";
-                            return (
-                              <div key={item.name} className="flex justify-between gap-6 py-0.5">
-                                <span className="text-muted-foreground">{item.name}:</span>
-                                <span className={colorClass}>
-                                  {isPositive ? `+${val.toFixed(3)}` : val.toFixed(3)} Ag.
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Legend
-                  iconSize={8}
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
-                />
-                <ReferenceLine y={0} stroke="rgba(148, 163, 184, 0.45)" strokeWidth={1.5} />
-
-                {isProvaReal ? (
-                  <Bar
-                    dataKey="prResultado"
-                    name="Resultado Prova Real"
-                    fill="#10b981"
-                    radius={[3, 3, 0, 0]}
-                  />
-                ) : (
-                  <Bar
-                    dataKey="waResultado"
-                    name="Resultado WhatsApp"
-                    fill="#3b82f6"
-                    radius={[3, 3, 0, 0]}
-                  />
-                )}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <Suspense
+          fallback={
+            <div
+              className="mt-6 h-[420px] animate-pulse rounded-xl border bg-muted/40"
+              aria-hidden="true"
+            />
+          }
+        >
+          <TimeGridChart
+            chartData={chartData}
+            chartDay={chartDay}
+            isProvaReal={isProvaReal}
+            onChartDayChange={setChartDay}
+          />
+        </Suspense>
       )}
     </div>
   );
 }
 
-function ValueCell({
-  view,
-  vol,
-  cap,
-  capR,
-  res,
-  f10,
-  f20,
-  isEditableCapR,
-  isWebchat,
-  onVol,
-  onCapR,
-}: {
-  view: View;
-  vol: number;
-  cap: number;
-  capR: number;
-  res: number;
-  f10: number;
-  f20: number;
-  isEditableCapR: boolean;
-  isWebchat: boolean;
-  onVol: (v: number) => void;
-  onCapR: (v: number) => void;
-}) {
+import React from "react";
+
+const ValueCell = React.memo(
+  function ValueCell({
+    view,
+    vol,
+    cap,
+    capR,
+    res,
+    f10,
+    f20,
+    isEditableCapR,
+    isWebchat,
+    onVol,
+    onCapR,
+  }: {
+    view: View;
+    vol: number;
+    cap: number;
+    capR: number;
+    res: number;
+    f10: number;
+    f20: number;
+    isEditableCapR: boolean;
+    isWebchat: boolean;
+    onVol: (v: number) => void;
+    onCapR: (v: number) => void;
+  }) {
   if (view === "volume") {
     return (
       <td className="px-2 py-1 text-right">
@@ -688,6 +595,10 @@ function ValueCell({
         <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-destructive/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-destructive animate-pulse">
           {f}
         </span>
+      ) : f < 0 ? (
+        <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+          {f}
+        </span>
       ) : (
         <span className="inline-flex min-w-[2rem] justify-center rounded border border-zinc-300 dark:border-zinc-700 bg-muted/20 px-2 py-0.5 text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
           0
@@ -695,4 +606,17 @@ function ValueCell({
       )}
     </td>
   );
-}
+},
+(prev, next) => {
+  return (
+    prev.view === next.view &&
+    prev.vol === next.vol &&
+    prev.cap === next.cap &&
+    prev.capR === next.capR &&
+    prev.res === next.res &&
+    prev.f10 === next.f10 &&
+    prev.f20 === next.f20 &&
+    prev.isEditableCapR === next.isEditableCapR &&
+    prev.isWebchat === next.isWebchat
+  );
+});

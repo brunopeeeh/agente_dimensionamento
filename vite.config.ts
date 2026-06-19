@@ -12,4 +12,24 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules/xlsx") || id.includes("node_modules/cfb")) {
+              return "xlsx";
+            }
+            if (
+              id.includes("node_modules/recharts") ||
+              id.includes("node_modules/victory-vendor") ||
+              id.includes("node_modules/d3-")
+            ) {
+              return "recharts";
+            }
+          },
+        },
+      },
+    },
+  },
 });

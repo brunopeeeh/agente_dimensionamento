@@ -1,13 +1,10 @@
 import { useMemo, useState } from "react";
-import { fmtNum } from "@/lib/sheets";
-import { RotateCcw, TrendingUp, Users, Headphones, Bot } from "lucide-react";
-import {
-  useDimensionamento,
-  DAYS,
-  Day,
-  TeamAgent,
-  matchAgentName,
-} from "@/context/DimensionamentoContext";
+import { fmtNum } from "@/lib/utils";
+import { RotateCcw, TrendingUp, Users, Headphones, Bot, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { matchAgentName } from "@/lib/agents";
+import { useDimensionamento, Day, TeamAgent } from "@/context/DimensionamentoContext";
+import { DaySelector } from "@/components/DaySelector";
 
 const SHIFT_HOURS = 8;
 
@@ -28,9 +25,47 @@ const isScheduledOnDay = (agent: TeamAgent, day: Day) => {
 };
 
 export function AgentCapacity() {
-  const { capacityAgents, updateCapacityAgent, resetAll, teamAgents, tmaFactors } =
-    useDimensionamento();
+  const capacityAgents = useDimensionamento((s) => s.capacityAgents);
+  const updateCapacityAgent = useDimensionamento((s) => s.updateCapacityAgent);
+  const resetAll = useDimensionamento((s) => s.resetAll);
+  const teamAgents = useDimensionamento((s) => s.teamAgents);
+  const currentMonth = useDimensionamento((s) => s.currentMonth);
+  const refreshCurrentMonth = useDimensionamento((s) => s.refreshCurrentMonth);
   const [selectedDay, setSelectedDay] = useState<Day | "Todos">("Todos");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleFreshchatSync = async () => {
+    if (!currentMonth) {
+      toast.error("Selecione um mês de planejamento antes de sincronizar.");
+      return;
+    }
+    setIsSyncing(true);
+    const loadingId = toast.loading(`Sincronizando Freshchat → ${currentMonth}…`);
+    try {
+      const teamAgentNames = teamAgents.filter((a) => a.active).map((a) => a.name);
+      const res = await fetch("/api/sync-from-freshchat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ month: currentMonth, teamAgentNames }),
+      });
+      const data = (await res.json()) as {
+        success: boolean;
+        message: string;
+        agents_synced: number;
+        error?: string;
+      };
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || data.error || `HTTP ${res.status}`);
+      }
+      await refreshCurrentMonth();
+      toast.success(data.message, { id: loadingId });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido.";
+      toast.error(`Falha no sync: ${message}`, { id: loadingId });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const rows = capacityAgents.map((a) => ({ ...a, ...deriveRow(a.mediaTri) }));
 
@@ -40,7 +75,15 @@ export function AgentCapacity() {
   // Dynamically map active team agents to capacity humanRows, defaulting mediaTri to 1500
   const humanRows = useMemo(() => {
     return teamAgents
-      .filter((agent) => agent.active)
+      .filter((agent) => {
+        if (!agent.active) return false;
+        const nameNorm = agent.name
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim();
+        return nameNorm !== "yooga suporte" && nameNorm !== "care ai" && nameNorm !== "care ia";
+      })
       .map((agent) => {
         const capMatch = capacityAgents.find((ca) => matchAgentName(ca.name, agent.name));
         const mediaTri = capMatch ? capMatch.mediaTri : 1500;
@@ -62,24 +105,6 @@ export function AgentCapacity() {
       return isScheduledOnDay(match, selectedDay);
     });
   }, [humanRows, selectedDay, teamAgents]);
-
-  const totals = useMemo(() => {
-    const list = humanAgentsFiltered;
-    return {
-      mediaTri: list.reduce((s, r) => s + r.mediaTri, 0),
-      resolvidosDia: list.reduce((s, r) => s + r.resolvidosDia, 0),
-      resolvidosHora: list.reduce((s, r) => s + r.resolvidosHora, 0),
-      capacityWebchat: list.reduce((s, r) => s + r.resolvidos10, 0) / Math.max(list.length, 1),
-    };
-  }, [humanAgentsFiltered]);
-
-  // Dynamic KPIs calculations using selected day TMA factors
-  const tmaFactor = useMemo(() => {
-    if (selectedDay === "Todos") {
-      return Object.values(tmaFactors).reduce((s, f) => s + f, 0) / 7;
-    }
-    return tmaFactors[selectedDay];
-  }, [tmaFactors, selectedDay]);
 
   // Total active human agents in the entire team roster (constant across days)
   const totalTeamAgentsCount = useMemo(() => {
@@ -265,42 +290,30 @@ export function AgentCapacity() {
                 Edite o volume trimestral (os demais valores são recalculados automaticamente).
               </p>
             </div>
-            <button
-              onClick={resetAll}
-              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              <RotateCcw className="h-3 w-3" /> Restaurar valores
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleFreshchatSync}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
+                {isSyncing ? "Sincronizando…" : "Sincronizar com Freshchat"}
+              </button>
+              <button
+                onClick={resetAll}
+                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                <RotateCcw className="h-3 w-3" /> Restaurar valores
+              </button>
+            </div>
           </div>
 
-          {/* Day of the week Selector Pills */}
-          <div className="flex flex-wrap gap-1 border-t border-border/40 pt-3.5 select-none">
-            <button
-              type="button"
-              onClick={() => setSelectedDay("Todos")}
-              className={`px-3 py-1 text-xs font-semibold border transition-all ${
-                selectedDay === "Todos"
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              Visão Geral
-            </button>
-            {DAYS.map((day) => (
-              <button
-                key={day}
-                type="button"
-                onClick={() => setSelectedDay(day)}
-                className={`px-3 py-1 text-xs font-semibold border transition-all ${
-                  selectedDay === day
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
-                }`}
-              >
-                {day}
-              </button>
-            ))}
-          </div>
+          <DaySelector
+            value={selectedDay}
+            onChange={setSelectedDay}
+            includeAll
+            className="border-t border-border/40 pt-3.5"
+          />
         </div>
 
         <div className="overflow-x-auto">
@@ -323,6 +336,7 @@ export function AgentCapacity() {
                   <td className="px-4 py-2 text-right">
                     <input
                       type="number"
+                      aria-label={`Média trimestral de ${r.name}`}
                       value={r.mediaTri}
                       onChange={(e) => {
                         const v = Number(e.target.value) || 0;
@@ -353,6 +367,7 @@ export function AgentCapacity() {
                   <td className="px-4 py-2 text-right">
                     <input
                       type="number"
+                      aria-label={`Média trimestral de ${supportRow.name}`}
                       value={supportRow.mediaTri}
                       onChange={(e) => {
                         const v = Number(e.target.value) || 0;
@@ -374,6 +389,7 @@ export function AgentCapacity() {
                   <td className="px-4 py-2 text-right">
                     <input
                       type="number"
+                      aria-label={`Média trimestral de ${aiRow.name}`}
                       value={aiRow.mediaTri}
                       onChange={(e) => {
                         const v = Number(e.target.value) || 0;
@@ -390,43 +406,8 @@ export function AgentCapacity() {
                 </tr>
               )}
             </tbody>
-            {selectedDay === "Todos" && (
-              <tfoot>
-                <tr className="bg-muted/60 font-semibold border-t">
-                  <td className="px-4 py-2.5">Total (humanos)</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {fmtNum(totals.mediaTri, 0)}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {fmtNum(totals.mediaTri / 3, 1)}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums">{totals.resolvidosDia}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {fmtNum(totals.resolvidosHora, 2)}
-                  </td>
-                  <td />
-                  <td />
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {label}
-        </div>
-        <TrendingUp className={`h-4 w-4 ${accent ? "text-primary" : "text-muted-foreground"}`} />
-      </div>
-      <div className={`mt-2 text-2xl font-semibold tabular-nums ${accent ? "text-primary" : ""}`}>
-        {value}
       </div>
     </div>
   );

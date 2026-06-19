@@ -1,18 +1,11 @@
-import React, { useMemo, useState } from "react";
-import {
-  useDimensionamento,
-  DAYS,
-  Day,
-  TeamAgent,
-  NewAgentHire,
-  AgentSchedule,
-} from "@/context/DimensionamentoContext";
+import { useMemo, useState } from "react";
+import { useDimensionamento, DAYS, Day, AgentSchedule } from "@/context/DimensionamentoContext";
+import { getActiveTimeBlocks, getNext20MinTime } from "@/lib/time";
 import {
   CheckCircle,
   AlertTriangle,
   ShieldCheck,
   Clock,
-  HelpCircle,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -31,7 +24,8 @@ type ValidationItem = {
 };
 
 export function EscalaValidator() {
-  const { teamAgents, newHires } = useDimensionamento();
+  const teamAgents = useDimensionamento((s) => s.teamAgents);
+  const newHires = useDimensionamento((s) => s.newHires);
   const [showTeam, setShowTeam] = useState(true);
   const [showHires, setShowHires] = useState(true);
 
@@ -167,24 +161,12 @@ export function EscalaValidator() {
 
       const firstDay = sortedDays[0];
       let start = "09:00";
-      const end = "18:00";
+      let end = "18:00";
       if (firstDay && agent.schedules[firstDay]) {
-        const activeIntervals = Object.keys(agent.schedules[firstDay]!.intervals).sort();
+        const activeIntervals = getActiveTimeBlocks(agent.schedules[firstDay]!.intervals);
         if (activeIntervals.length > 0) {
           start = activeIntervals[0];
-          const lastBlock = activeIntervals[activeIntervals.length - 1];
-          try {
-            const [eh, em] = lastBlock.split(":").map(Number);
-            let rem = em + 20;
-            let rh = eh;
-            if (rem >= 60) {
-              rh += 1;
-              rem -= 60;
-            }
-            if (rh >= 24) rh = 0;
-          } catch (e) {
-            // Ignora erros de parsing de hora fora do padrão
-          }
+          end = getNext20MinTime(activeIntervals[activeIntervals.length - 1]);
         }
       }
 
@@ -234,11 +216,13 @@ export function EscalaValidator() {
         <div>
           {allValid ? (
             <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/20 dark:border-emerald-900/50 px-2 py-0.5 rounded-sm">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Escala 100% Regular
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Escala
+              100% Regular
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-amber-800 bg-amber-50 border border-amber-200 dark:text-amber-400 dark:bg-amber-950/20 dark:border-amber-900/50 px-2 py-0.5 rounded-sm animate-pulse">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-450" /> {totalViolations} Inconsistências Detectadas
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-450" />{" "}
+              {totalViolations} Inconsistências Detectadas
             </span>
           )}
         </div>

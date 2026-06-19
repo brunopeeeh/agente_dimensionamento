@@ -1,0 +1,86 @@
+import type { Day, IntervalStatus } from "@/context/DimensionamentoContext";
+
+export const EXTRA_TABS = ["Agente dia", "Quantidade de agente dia"] as const;
+export type ExtraTab = (typeof EXTRA_TABS)[number];
+export type EscalaTab = Day | ExtraTab;
+
+export const SHIFT_PRESETS = [
+  { label: "Turno A (07-16)", start: "07:00", end: "16:00", lunch: "11:00" },
+  { label: "Turno B (08-17)", start: "08:00", end: "17:00", lunch: "12:00" },
+  { label: "Turno C (09-18)", start: "09:00", end: "18:00", lunch: "13:00" },
+  { label: "Turno D (10-19)", start: "10:00", end: "19:00", lunch: "14:00" },
+  { label: "Tarde A (11-20)", start: "11:00", end: "20:00", lunch: "14:00" },
+  { label: "Tarde B (12-21)", start: "12:00", end: "21:00", lunch: "15:00" },
+  { label: "Tarde C (13-22)", start: "13:00", end: "22:00", lunch: "17:00" },
+  { label: "Noite A (14-23)", start: "14:00", end: "23:00", lunch: "18:00" },
+  { label: "Noite B (15-00)", start: "15:00", end: "00:00", lunch: "19:00" },
+  { label: "Noite C (16-01)", start: "16:00", end: "01:00", lunch: "20:00" },
+  { label: "Fechamento (18-03)", start: "18:00", end: "03:00", lunch: "22:00" },
+] as const;
+
+export function generateTimeBlocks20(): string[] {
+  const blocks: string[] = [];
+  let h = 7;
+  let m = 0;
+  while (h < 24) {
+    blocks.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+    m += 20;
+    if (m >= 60) {
+      h += 1;
+      m -= 60;
+    }
+  }
+  return blocks;
+}
+
+export function generateLunchOptions(): string[] {
+  const options: string[] = [];
+  for (let h = 11; h <= 22; h++) {
+    options.push(`${h.toString().padStart(2, "0")}:00`);
+  }
+  return options;
+}
+
+export function getCellStyles(status: IntervalStatus, isSimulated?: boolean): string {
+  if (isSimulated) {
+    switch (status) {
+      case "trabalhando":
+        return "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-dashed border-emerald-500/40 hover:bg-emerald-500/25";
+      case "externo":
+        return "bg-[#bae1ff]/40 text-[#1b4365] border border-dashed border-[#bae1ff]/60";
+      case "pausa":
+        return "bg-[#f8b890]/40 text-[#6d3000] border border-dashed border-[#f8b890]/60";
+      case "folga":
+      default:
+        return "bg-white dark:bg-[#1a1b23] text-transparent border border-dashed border-slate-200/20";
+    }
+  }
+  switch (status) {
+    case "trabalhando":
+      return "bg-[#c6dfc0] text-[#2d5a27] hover:bg-[#b6cfb0] border-slate-200/50";
+    case "externo":
+      return "bg-[#bae1ff] text-[#1b4365] hover:bg-[#a6d4fa] border-slate-200/50";
+    case "pausa":
+      return "bg-[#f8b890] text-[#6d3000] hover:bg-[#e8a880] border-slate-200/50";
+    case "folga":
+    default:
+      return "bg-white dark:bg-[#1a1b23] text-transparent hover:bg-slate-50 dark:hover:bg-slate-800/20 border-slate-200/20";
+  }
+}
+
+export function formatDayHeader(day: Day): string {
+  switch (day) {
+    case "Segunda":
+      return "Segunda-feira";
+    case "Terça":
+      return "Terça-feira";
+    case "Quarta":
+      return "Quarta-feira";
+    case "Quinta":
+      return "Quinta-feira";
+    case "Sexta":
+      return "Sexta-feira";
+    default:
+      return day.toUpperCase();
+  }
+}

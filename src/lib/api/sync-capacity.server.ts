@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import process from "node:process";
+import { matchAgentName } from "@/lib/agents";
+import type { TeamAgent } from "@/context/DimensionamentoContext";
 
 /**
  * Server-only module: syncs capacity agent data from n8n to Supabase.
@@ -38,41 +40,21 @@ type SyncResult =
 
 function getSupabaseServer() {
   const url = process.env.VITE_SUPABASE_URL || "";
-  const key = process.env.VITE_SUPABASE_ANON_KEY || "";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+  const key = serviceKey || anonKey;
   if (!url || !key) return null;
   return createClient(url, key);
 }
 
-// Name matching functions identical to those in DimensionamentoContext
-const normalizeName = (name: string) => {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // remove accents
-    .replace(/[^a-z]/g, ""); // keep only alphabet letters
-};
+// Name matching is imported from @/context/DimensionamentoContext to keep
+// client and server in sync (single source of truth).
 
-const matchAgentName = (capName: string, teamName: string) => {
-  const capNorm = normalizeName(capName);
-  const teamNorm = normalizeName(teamName);
-
-  // Explicit manual mappings for discrepancies between trimester volume names & team schedules
-  if (capNorm === "andreia" && teamNorm.includes("andrea")) return true;
-  if (capNorm === "marlonsa" && teamNorm.includes("marlon")) return true;
-  if (capNorm === "malu" && (teamNorm.includes("malu") || teamNorm.includes("marialuiza")))
-    return true;
-  if (capNorm === "romerio" && teamNorm.includes("romerio")) return true;
-  if (capNorm === "brenda" && teamNorm.includes("brenda")) return true;
-  if (capNorm === "rafael" && teamNorm.includes("rafael")) return true;
-  if (capNorm === "bryan" && teamNorm.includes("bryan")) return true;
-  if (capNorm === "julio" && teamNorm.includes("julio")) return true;
-
-  return teamNorm.includes(capNorm) || capNorm.includes(teamNorm);
-};
-
-export async function handleSyncCapacity(body: SyncCapacityBody): Promise<{ status: number; data: SyncResult }> {
+export async function handleSyncCapacity(
+  body: SyncCapacityBody,
+): Promise<{ status: number; data: SyncResult }> {
   // 1. Validate payload
-  if (!body.month || typeof body.month !== "string") {
+  if (!body || !body.month || typeof body.month !== "string") {
     return {
       status: 400,
       data: {
@@ -88,7 +70,7 @@ export async function handleSyncCapacity(body: SyncCapacityBody): Promise<{ stat
       data: {
         success: false,
         error:
-          'Payload inválido. Esperado: { capacity_agents: [{ name: string, mediaTri: number }], month: string }',
+          "Payload inválido. Esperado: { capacity_agents: [{ name: string, mediaTri: number }], month: string }",
       },
     };
   }
@@ -111,7 +93,8 @@ export async function handleSyncCapacity(body: SyncCapacityBody): Promise<{ stat
       status: 503,
       data: {
         success: false,
-        error: "Supabase não configurado no servidor. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.",
+        error:
+          "Supabase não configurado no servidor. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.",
       },
     };
   }
@@ -154,26 +137,25 @@ export async function handleSyncCapacity(body: SyncCapacityBody): Promise<{ stat
     };
   }
 
-  const currentTeamAgents = escalaObj?.team_agents || [];
+  const currentTeamAgents = (escalaObj?.team_agents || []) as TeamAgent[];
   const incomingAgents = body.capacity_agents;
 
   // 4. Determine agents to keep, add, or remove
-  // Keep: Agents in team_agents that match any incoming agent
-  const keptTeamAgents = currentTeamAgents.filter((teamAgent: any) => {
-    return incomingAgents.some((incoming) => matchAgentName(incoming.name, teamAgent.name));
-  });
+  // We should NOT delete existing team agents just because they aren't in the incoming capacity list.
+  // They might be inactive, managers, or not in Freshchat. We keep all existing agents.
+  const keptTeamAgents = [...currentTeamAgents];
 
-  const removedAgentNames = currentTeamAgents
-    .filter((teamAgent: any) => {
-      return !incomingAgents.some((incoming) => matchAgentName(incoming.name, teamAgent.name));
-    })
-    .map((teamAgent: any) => teamAgent.name);
+  // For logging purposes, we can consider an agent "removed from capacity" if they were in the previous capacity_agents but not the new one,
+  // but we do NOT remove them from the team roster.
+  const removedAgentNames: string[] = [];
 
   // Add: Incoming agents that do not match any team agent
   const addedAgentNames: string[] = [];
   const newTeamAgents = incomingAgents
     .filter((incoming) => {
-      return !currentTeamAgents.some((teamAgent: any) => matchAgentName(incoming.name, teamAgent.name));
+      return !currentTeamAgents.some((teamAgent: TeamAgent) =>
+        matchAgentName(incoming.name, teamAgent.name),
+      );
     })
     .map((incoming, index) => {
       addedAgentNames.push(incoming.name);
@@ -188,16 +170,14 @@ export async function handleSyncCapacity(body: SyncCapacityBody): Promise<{ stat
   const finalTeamAgents = [...keptTeamAgents, ...newTeamAgents];
 
   // 5. Update or insert the escala_equipe entry
-  const { error: updateError } = await supabase
-    .from("escala_equipe")
-    .upsert(
-      {
-        mes_id: mesId,
-        team_agents: finalTeamAgents,
-        capacity_agents: incomingAgents,
-      },
-      { onConflict: "mes_id" }
-    );
+  const { error: updateError } = await supabase.from("escala_equipe").upsert(
+    {
+      mes_id: mesId,
+      team_agents: finalTeamAgents,
+      capacity_agents: incomingAgents,
+    },
+    { onConflict: "mes_id" },
+  );
 
   if (updateError) {
     return {
