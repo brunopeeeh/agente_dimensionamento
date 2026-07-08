@@ -10,6 +10,9 @@ import {
   Check,
   CloudOff,
   Menu,
+  Eye,
+  Lock,
+  Unlock,
 } from "lucide-react";
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
@@ -58,11 +61,14 @@ export function SiteNav({ onOpenMobile }: SiteNavProps) {
     saveStatus,
     changeActiveMonth,
     createNewMonth,
+    isReadOnly,
+    setIsReadOnly,
   } = useDimensionamento();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newMonthName, setNewMonthName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [pendingMonthChange, setPendingMonthChange] = useState<string | null>(null);
 
   const closeModal = useCallback(() => {
     if (isCreating) return;
@@ -85,7 +91,7 @@ export function SiteNav({ onOpenMobile }: SiteNavProps) {
       setIsModalOpen(true);
       return;
     }
-    changeActiveMonth(val);
+    setPendingMonthChange(val);
   };
 
   const handleCreateMonth = async (e: React.FormEvent) => {
@@ -116,9 +122,9 @@ export function SiteNav({ onOpenMobile }: SiteNavProps) {
           >
             <Menu className="h-5 w-5" />
           </button>
-          
+
           <div className="flex items-center gap-2">
-            <Link to="/" className="flex items-center gap-2 mr-3">
+            <Link to="/painel" className="flex items-center gap-2 mr-3">
               <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
                 <Activity className="h-4 w-4" />
               </div>
@@ -126,7 +132,7 @@ export function SiteNav({ onOpenMobile }: SiteNavProps) {
                 <div className="text-sm font-semibold text-foreground">Dimensionamento Care</div>
               </div>
             </Link>
-            <div className="flex items-center gap-1 border-l pl-3 h-7">
+            <div className="flex items-center gap-1.5 border-l pl-3 py-1">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground mr-0.5" aria-hidden="true" />
               <label htmlFor="month-select" className="sr-only">
                 Selecionar mês de planejamento
@@ -137,7 +143,7 @@ export function SiteNav({ onOpenMobile }: SiteNavProps) {
                 onChange={handleMonthChange}
                 disabled={isLoading}
                 aria-label="Selecionar mês de planejamento"
-                className="bg-transparent text-[11px] font-semibold text-muted-foreground focus:outline-none cursor-pointer hover:text-foreground transition-colors border-none p-0 pr-1 select-none"
+                className="bg-muted/40 border border-border/80 rounded-md text-xs md:text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-ring/40 cursor-pointer hover:bg-muted/80 hover:text-foreground transition-all px-2 py-1 select-none"
               >
                 {availableMonths.map((m) => (
                   <option key={m} value={m} className="bg-card text-foreground text-xs">
@@ -150,13 +156,101 @@ export function SiteNav({ onOpenMobile }: SiteNavProps) {
               </select>
               {isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-1" />}
             </div>
+
+            {isReadOnly ? (
+              <div className="flex items-center gap-1 border-l pl-3 ml-1 h-7">
+                <span className="text-[10px] uppercase font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-sm mr-1 tracking-wider hidden sm:inline-block">
+                  Visualização
+                </span>
+                <button
+                  onClick={() => setIsReadOnly(false)}
+                  className="text-muted-foreground hover:text-amber-500 transition-colors"
+                  title="Destrancar para Edição"
+                >
+                  <Lock className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 border-l pl-3 ml-1 h-7">
+                <button
+                  onClick={() => setIsReadOnly(true)}
+                  className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                  title="Trancar Mês (Modo Visualização)"
+                >
+                  <Unlock className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             {!isLoading && saveStatus !== "idle" && <SaveIndicator status={saveStatus} />}
           </div>
-          
+
           {/* Espaço para ações globais futuras (Perfil, Notificações, etc) podem entrar aqui do lado direito */}
           <div className="flex-1" />
         </div>
       </header>
+
+      {pendingMonthChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-lg animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              Acessar Mês
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Você está prestes a abrir o mês de <strong>{pendingMonthChange}</strong>. Como deseja
+              acessá-lo?
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setIsReadOnly(true);
+                  changeActiveMonth(pendingMonthChange);
+                  setPendingMonthChange(null);
+                }}
+                className="flex items-center gap-3 w-full rounded-lg border p-4 text-left hover:bg-accent transition-colors"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                  <Eye className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="font-semibold text-sm">Somente Visualização</div>
+                  <div className="text-xs text-muted-foreground">
+                    Bloqueia edições acidentais (Recomendado).
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsReadOnly(false);
+                  changeActiveMonth(pendingMonthChange);
+                  setPendingMonthChange(null);
+                }}
+                className="flex items-center gap-3 w-full rounded-lg border p-4 text-left hover:bg-accent transition-colors"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                  <Unlock className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="font-semibold text-sm">Modo Edição</div>
+                  <div className="text-xs text-muted-foreground">
+                    Permite alterar volumes, escalas e capacidades.
+                  </div>
+                </div>
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setPendingMonthChange(null)}
+                className="rounded-md px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div

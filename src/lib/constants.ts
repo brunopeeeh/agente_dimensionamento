@@ -3,7 +3,7 @@ import type { NewAgentHire } from "@/context/types";
 import type { ScenarioParams } from "@/context/types";
 
 // ---- Operational math ----
-export const DEFAULT_MEDIA_TRI = 1500;
+export const DEFAULT_MEDIA_TRI = 750;
 export const MONTHS_PER_QUARTER = 3;
 export const WORKING_DAYS_PER_MONTH = 20;
 export const HOURS_PER_SHIFT = 8;

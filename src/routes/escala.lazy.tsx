@@ -9,9 +9,6 @@ function EscalaPage() {
   return (
     <div className="space-y-6">
       <div className="mb-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Yooga Care · WFM
-        </div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Gestão de Escalas</h1>
         <p className="text-sm text-muted-foreground">
           Gerencie a escala da equipe de suporte em tempo real.

@@ -45,28 +45,6 @@ export type ScenarioParams = {
 
 export type RowCalculation = {
   time: string;
-  webchat: {
-    volume: number;
-    capacityRaw: number;
-    capacityRounded: number;
-    surplus: number;
-    agentsForWhats: number;
-  };
-  whatsapp: {
-    volume: number;
-    capacityRaw: number;
-    capacityRounded: number;
-    surplus: number;
-    agentsFaltantes10: number;
-    agentsFaltantes20: number;
-  };
-  provaReal: {
-    capacityRaw: number;
-    capacityRounded: number;
-    surplus: number;
-    agentsFaltantes10: number;
-    agentsFaltantes20: number;
-  };
   volume: number[];
   capacity: number[];
   capacityR: number[];
@@ -104,6 +82,9 @@ export type DimensionamentoKpis = {
   totalDeficit20: number;
   provaRealDeficit10: number;
   excedenteTotal: number;
+  picoMaximo: { day: string; time: string; deficit: number };
+  horasOciosas: number;
+  coberturaProjetada: number;
 };
 
 export type DimensionamentoState = {
@@ -121,6 +102,8 @@ export type DimensionamentoState = {
   availableMonths: string[];
   isLoading: boolean;
   saveStatus: SaveStatus;
+  isReadOnly: boolean;
+  setIsReadOnly: (val: boolean) => void;
   changeActiveMonth: (monthName: string) => Promise<void>;
   createNewMonth: (newMonthName: string) => Promise<void>;
   refreshCurrentMonth: () => Promise<void>;
@@ -130,7 +113,6 @@ export type DimensionamentoState = {
     channel: "webchat" | "whatsapp",
     value: number,
   ) => void;
-  updateTimeBlockAgents: (time: string, day: Day, value: number) => void;
   updateTmaFactor: (day: Day, value: number) => void;
   updateSimultaneous: (channel: "webchat" | "whatsapp", value: number) => void;
   setTeamAgents: React.Dispatch<React.SetStateAction<TeamAgent[]>>;
@@ -152,6 +134,9 @@ export type DimensionamentoState = {
   updateScenario: (key: keyof ScenarioParams, value: number) => void;
   updateCapacityAgent: (name: string, value: number) => void;
   resetAll: () => void;
+  isResetConfirmOpen: boolean;
+  setIsResetConfirmOpen: (val: boolean) => void;
+  executeResetAll: () => Promise<void>;
   importPowerBIData: (webchatCsv: string, whatsappCsv: string) => boolean;
   updateChannelVolumes: (
     channel: "webchat" | "whatsapp",

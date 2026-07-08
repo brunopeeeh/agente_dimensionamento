@@ -50,3 +50,22 @@ supabase/.temp/
 # Project files and documents (Excel/PDF)
 *.xlsx
 *.pdf
+
+# Claude Code local tooling (settings, plans, lock files)
+.claude/
+
+# Scratch / scripts de exploração e screenshots
+scratch/
+scratch_*.cjs
+scratch_*.mjs
+
+# Notas de trabalho temporárias
+ANALISE_PROJETO.md
+README_MIGRATIONS.md
+
+# AI / Graphify outputs
+.agents/
+.gemini/
+graphify-out/
+.graphifyignore
+

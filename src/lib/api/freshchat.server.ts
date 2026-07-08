@@ -130,12 +130,19 @@ export async function getAgentVolumes90Days(agentIds: string[]): Promise<Record<
   }
   if (agentIds.length === 0) return {};
 
-  // 90-day window: from (today - 90) to today, formatted as yyyy-MM-dd.
-  const end = new Date();
+  // Ajuste para pegar a data atual no fuso horário do Brasil (UTC-3)
+  // e definir o fim como 00:00:00 do dia atual, ignorando as horas de hoje.
+  const now = new Date();
+  const localTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+
+  const end = new Date(
+    Date.UTC(localTime.getUTCFullYear(), localTime.getUTCMonth(), localTime.getUTCDate()),
+  );
   const start = new Date(end);
-  start.setDate(end.getDate() - 90);
-  const startStr = start.toISOString().slice(0, 10);
-  const endStr = end.toISOString().slice(0, 10);
+  start.setUTCDate(end.getUTCDate() - 90);
+
+  const startStr = start.toISOString(); // ex: 2026-03-31T00:00:00.000Z
+  const endStr = end.toISOString(); // ex: 2026-06-29T00:00:00.000Z
 
   const volumes: Record<string, number> = {};
   let cursor = 0;
@@ -164,10 +171,12 @@ export async function getAgentVolumes90Days(agentIds: string[]): Promise<Record<
               accept: "application/json",
             },
           });
-          
+
           if (!res.ok) {
             if (res.status === 429) {
-              console.warn(`[freshchat] Rate limited (429) for agent ${id}. Retrying in ${backoffMs}ms...`);
+              console.warn(
+                `[freshchat] Rate limited (429) for agent ${id}. Retrying in ${backoffMs}ms...`,
+              );
               await new Promise((resolve) => setTimeout(resolve, backoffMs));
               backoffMs *= 2;
               retries--;

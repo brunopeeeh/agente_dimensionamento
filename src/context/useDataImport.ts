@@ -108,10 +108,7 @@ export function useDataImport(
   );
 
   const updateChannelVolumes = useCallback(
-    (
-      channel: "webchat" | "whatsapp",
-      newVolumes: Record<string, Record<Day, number>>,
-    ) => {
+    (channel: "webchat" | "whatsapp", newVolumes: Record<string, Record<Day, number>>) => {
       const targetSetter = channel === "webchat" ? setWebchatVolumes : setWhatsappVolumes;
       targetSetter((prev) => {
         const updated = { ...prev };

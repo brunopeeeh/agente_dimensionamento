@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo, useState, useEffect, lazy, Suspense } from "react";
+import React, { useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useDimensionamento, DAYS, Day } from "@/context/DimensionamentoContext";
 import { RotateCcw, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const TimeGridChart = lazy(() =>
   import("./TimeGridChart").then((module) => ({ default: module.TimeGridChart })),
@@ -12,7 +13,7 @@ export type GridMode = "webchat" | "whatsapp" | "provaReal";
 
 type Props = { mode: GridMode; title: string; subtitle?: string };
 
-type View = "volume" | "capacity" | "capacityR" | "resultado" | "faltam10" | "faltam20";
+type View = "volume" | "capacity" | "capacityR" | "resultado" | "faltam10";
 
 const MODE_LABELS: Record<GridMode, string> = {
   webchat: "Webchat",
@@ -23,9 +24,9 @@ const MODE_LABELS: Record<GridMode, string> = {
 export function TimeGridSheet({ mode, title, subtitle }: Props) {
   const rowCalculations = useDimensionamento((s) => s.rowCalculations);
   const updateTimeBlockVolume = useDimensionamento((s) => s.updateTimeBlockVolume);
-  const updateTimeBlockAgents = useDimensionamento((s) => s.updateTimeBlockAgents);
   const resetAll = useDimensionamento((s) => s.resetAll);
   const updateChannelVolumes = useDimensionamento((s) => s.updateChannelVolumes);
+  const isReadOnly = useDimensionamento((s) => s.isReadOnly);
 
   const [view, setView] = useState<View>("capacity");
   const [chartDay, setChartDay] = useState<Day>("Segunda");
@@ -57,6 +58,7 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
         const worksheet = workbook.Sheets[firstSheetName];
 
         // Convert worksheet to JSON rows (array of arrays)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
         if (rows.length < 2) {
           throw new Error("O arquivo Excel não contém linhas de dados suficientes.");
@@ -177,9 +179,10 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
         toast.success(
           `Planilha processada! ${parsedRowsCount} faixas de horários importadas e divididas por 13.`,
         );
-      } catch (err: any) {
+      } catch (err) {
         console.error("Error reading excel file:", err);
-        toast.error(`Erro ao processar planilha: ${err?.message || "Layout incompatível"}`);
+        const message = err instanceof Error ? err.message : "Layout incompatível";
+        toast.error(`Erro ao processar planilha: ${message}`);
       } finally {
         setIsUploading(false);
         e.target.value = "";
@@ -195,30 +198,69 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
     reader.readAsArrayBuffer(file);
   };
 
-  // Reset to capacity if faltam20 is active — it's removed from all channels now
-  useEffect(() => {
-    if (view === "faltam20") {
-      setView("capacity");
-    }
-  }, [view]);
-
   // Dynamically define views available for this tab
   const currentViews = useMemo(() => {
     if (isWebchat) {
       return [
-        { id: "volume" as View, label: "Volume" },
-        { id: "capacity" as View, label: "Capacity" },
-        { id: "capacityR" as View, label: "Capacity Arredondado" },
-        { id: "resultado" as View, label: "Resultado" },
-        { id: "faltam10" as View, label: "Agentes para o Whatsapp" },
+        {
+          id: "volume" as View,
+          label: "Volume",
+          tooltip: "Quantidade média de conversas iniciadas neste intervalo de 10 minutos.",
+        },
+        {
+          id: "capacity" as View,
+          label: "Capacity",
+          tooltip: "Quantidade de conversas que a equipe escala ativa consegue absorver.",
+        },
+        {
+          id: "capacityR" as View,
+          label: "Capacity Arredondado",
+          tooltip:
+            "Quantidade de conversas que a equipe escala ativa consegue absorver, arredondado para números inteiros.",
+        },
+        {
+          id: "resultado" as View,
+          label: "Resultado",
+          tooltip:
+            "Diferença entre Capacity Arredondado e Volume (valores positivos indicam folga de atendimento; valores negativos indicam déficit).",
+        },
+        {
+          id: "faltam10" as View,
+          label: "Agentes para o Whatsapp",
+          tooltip:
+            "Analistas excedentes do Webchat que são direcionados para o WhatsApp neste intervalo.",
+        },
       ];
     }
     return [
-      { id: "volume" as View, label: "Volume" },
-      { id: "capacity" as View, label: "Capacity" },
-      { id: "capacityR" as View, label: "Capacity Arredondado" },
-      { id: "resultado" as View, label: "Resultado" },
-      { id: "faltam10" as View, label: "Quantidade de Agentes que Faltam", tone: "warn" as const },
+      {
+        id: "volume" as View,
+        label: "Volume",
+        tooltip: "Quantidade média de conversas iniciadas neste intervalo de 10 minutos.",
+      },
+      {
+        id: "capacity" as View,
+        label: "Capacity",
+        tooltip: "Quantidade de conversas que a equipe escala ativa consegue absorver.",
+      },
+      {
+        id: "capacityR" as View,
+        label: "Capacity Arredondado",
+        tooltip:
+          "Quantidade de conversas que a equipe escala ativa consegue absorver, arredondado para números inteiros.",
+      },
+      {
+        id: "resultado" as View,
+        label: "Resultado",
+        tooltip:
+          "Diferença entre Capacity Arredondado e Volume (valores positivos indicam folga de atendimento; valores negativos indicam déficit).",
+      },
+      {
+        id: "faltam10" as View,
+        label: "Quantidade de Agentes que Faltam",
+        tooltip:
+          "Quantidade de analistas necessários para cobrir o déficit de atendimento neste horário.",
+      },
     ];
   }, [isWebchat]);
 
@@ -234,28 +276,28 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
       let faltam20: number[];
 
       if (isWebchat) {
-        volume = (r as any).volume;
-        capacity = (r as any).capacity;
-        capacityR = (r as any).capacityR;
-        resultado = (r as any).resultado;
+        volume = r.volume;
+        capacity = r.capacity;
+        capacityR = r.capacityR;
+        resultado = r.resultado;
         // In Webchat, faltam10 represents "Agentes para o Whatsapp" (wcAgentsForWhats calculated as floor of surplus/3)
-        faltam10 = (r as any).agentsWhats || Array(7).fill(0);
+        faltam10 = r.agentsWhats;
         faltam20 = Array(7).fill(0);
       } else if (isProvaReal) {
-        volume = (r as any).waVolume;
-        capacity = (r as any).prCapacity;
-        capacityR = (r as any).prCapacityR;
-        resultado = (r as any).prResultado;
-        faltam10 = (r as any).prFaltam10;
-        faltam20 = (r as any).prFaltam20;
+        volume = r.waVolume;
+        capacity = r.prCapacity;
+        capacityR = r.prCapacityR;
+        resultado = r.prResultado;
+        faltam10 = r.prFaltam10;
+        faltam20 = r.prFaltam20;
       } else {
         // WhatsApp sheet
-        volume = (r as any).waVolume;
-        capacity = (r as any).waCapacity;
-        capacityR = (r as any).waCapacityR;
-        resultado = (r as any).waResultado;
-        faltam10 = (r as any).waFaltam10;
-        faltam20 = (r as any).waFaltam20;
+        volume = r.waVolume;
+        capacity = r.waCapacity;
+        capacityR = r.waCapacityR;
+        resultado = r.waResultado;
+        faltam10 = r.waFaltam10;
+        faltam20 = r.waFaltam20;
       }
 
       return {
@@ -266,8 +308,8 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
         resultado,
         faltam10,
         faltam20,
-        waResultado: (r as any).waResultado || Array(7).fill(0),
-        prResultado: (r as any).prResultado || Array(7).fill(0),
+        waResultado: r.waResultado,
+        prResultado: r.prResultado,
       };
     });
   }, [rowCalculations, isWebchat, isProvaReal]);
@@ -297,13 +339,20 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
     updateTimeBlockVolume(time, day, channel, val);
   };
 
-  const handleCapRChange = (time: string, dayIdx: number, val: number) => {
-    const day = DAYS[dayIdx];
-    // If it's Webchat, modifying capacityR edits the underlying active agents scale!
-    if (isWebchat) {
-      updateTimeBlockAgents(time, day, val);
-    }
-  };
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: gridRows.length,
+    getScrollElement: () => scrollRef.current,
+    // Row height changes with `view` (py-1 vs py-1.5 in ValueCell), so we measure
+    // the real rendered height instead of hardcoding a px value per view.
+    estimateSize: () => 33,
+    overscan: 8,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const virtualTotalSize = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
+  const paddingBottom =
+    virtualRows.length > 0 ? virtualTotalSize - virtualRows[virtualRows.length - 1].end : 0;
 
   return (
     <div className="space-y-5">
@@ -328,7 +377,7 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
 
           <div className="relative shrink-0 w-full sm:w-auto">
             <label
-              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-semibold hover:bg-primary/95 transition-all shadow-md cursor-pointer ${isUploading ? "opacity-70 pointer-events-none" : ""}`}
+              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-semibold hover:bg-primary/95 transition-all shadow-md cursor-pointer ${isUploading || isReadOnly ? "opacity-70 pointer-events-none" : ""}`}
             >
               {isUploading ? (
                 <>
@@ -344,7 +393,7 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
               <input
                 type="file"
                 accept=".xlsx, .xls"
-                disabled={isUploading}
+                disabled={isUploading || isReadOnly}
                 onChange={handleExcelUpload}
                 className="hidden"
               />
@@ -361,21 +410,24 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
           </div>
           <div className="flex flex-wrap items-center gap-1">
             {currentViews.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => setView(v.id)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  view === v.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                }`}
-              >
-                {v.label}
-              </button>
+              <span key={v.id} className="inline-flex items-center gap-0.5 select-none">
+                <button
+                  onClick={() => setView(v.id)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    view === v.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  }`}
+                >
+                  {v.label}
+                </button>
+                <Tooltip content={v.tooltip} />
+              </span>
             ))}
             <button
               onClick={resetAll}
-              className="ml-2 inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+              disabled={isReadOnly}
+              className="ml-2 inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
               title="Restaurar originais"
             >
               <RotateCcw className="h-3 w-3" />
@@ -383,7 +435,7 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
           </div>
         </div>
 
-        <div className="max-h-[70vh] overflow-auto">
+        <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -396,29 +448,46 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
               </tr>
             </thead>
             <tbody>
-              {gridRows.map((r) => (
-                <tr key={r.time} className="border-b last:border-0 hover:bg-accent/20">
-                  <td className="bg-card px-3 py-1.5 font-mono text-xs text-muted-foreground">
-                    {r.time}
-                  </td>
-                  {DAYS.map((_, d) => (
-                    <ValueCell
-                      key={d}
-                      view={view}
-                      vol={r.volume[d]}
-                      cap={r.capacity[d]}
-                      capR={r.capacityR[d]}
-                      res={r.resultado[d]}
-                      f10={r.faltam10[d]}
-                      f20={r.faltam20[d]}
-                      isEditableCapR={false} // Capacity is derived dynamically from the active agents' schedules
-                      isWebchat={isWebchat}
-                      onVol={(v) => handleVolChange(r.time, d, v)}
-                      onCapR={(v) => handleCapRChange(r.time, d, v)}
-                    />
-                  ))}
+              {paddingTop > 0 && (
+                <tr aria-hidden="true">
+                  <td style={{ height: paddingTop, padding: 0, border: 0 }} colSpan={8} />
                 </tr>
-              ))}
+              )}
+              {virtualRows.map((virtualRow) => {
+                const r = gridRows[virtualRow.index];
+                return (
+                  <tr
+                    key={r.time}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className="border-b last:border-0 hover:bg-accent/20"
+                  >
+                    <td className="bg-card px-3 py-1.5 font-mono text-xs text-muted-foreground">
+                      {r.time}
+                    </td>
+                    {DAYS.map((_, d) => (
+                      <ValueCell
+                        key={d}
+                        view={view}
+                        vol={r.volume[d]}
+                        cap={r.capacity[d]}
+                        capR={r.capacityR[d]}
+                        res={r.resultado[d]}
+                        f10={r.faltam10[d]}
+                        isEditableCapR={false} // Capacity is derived dynamically from the active agents' schedules
+                        isWebchat={isWebchat}
+                        isReadOnly={isReadOnly}
+                        onVol={(v) => handleVolChange(r.time, d, v)}
+                      />
+                    ))}
+                  </tr>
+                );
+              })}
+              {paddingBottom > 0 && (
+                <tr aria-hidden="true">
+                  <td style={{ height: paddingBottom, padding: 0, border: 0 }} colSpan={8} />
+                </tr>
+              )}
             </tbody>
             <tfoot className="sticky bottom-0 bg-muted/80 backdrop-blur">
               <tr className="border-t font-semibold">
@@ -471,8 +540,6 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
   );
 }
 
-import React from "react";
-
 const ValueCell = React.memo(
   function ValueCell({
     view,
@@ -481,11 +548,10 @@ const ValueCell = React.memo(
     capR,
     res,
     f10,
-    f20,
     isEditableCapR,
     isWebchat,
+    isReadOnly,
     onVol,
-    onCapR,
   }: {
     view: View;
     vol: number;
@@ -493,90 +559,111 @@ const ValueCell = React.memo(
     capR: number;
     res: number;
     f10: number;
-    f20: number;
     isEditableCapR: boolean;
     isWebchat: boolean;
+    isReadOnly?: boolean;
     onVol: (v: number) => void;
-    onCapR: (v: number) => void;
   }) {
-  if (view === "volume") {
-    return (
-      <td className="px-2 py-1 text-right">
-        <input
-          type="number"
-          step="0.01"
-          value={Number(vol.toFixed(3))}
-          onChange={(e) => onVol(Number(e.target.value) || 0)}
-          className="w-20 rounded-md border bg-background px-2 py-0.5 text-right text-xs tabular-nums focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring/40"
-        />
-      </td>
-    );
-  }
-  if (view === "capacityR") {
-    return (
-      <td className="px-2 py-1 text-right">
-        {isEditableCapR ? (
+    if (view === "volume") {
+      return (
+        <td className="px-2 py-1 text-right">
           <input
             type="number"
-            step="1"
-            value={capR}
-            onChange={(e) => onCapR(Number(e.target.value) || 0)}
-            className="w-16 rounded-md border bg-background px-2 py-0.5 text-right text-xs tabular-nums focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring/40"
+            step="0.01"
+            value={Number(vol.toFixed(3))}
+            disabled={isReadOnly}
+            onChange={(e) => onVol(Number(e.target.value) || 0)}
+            className="w-20 rounded-md border bg-background px-2 py-0.5 text-right text-xs tabular-nums focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring/40 disabled:opacity-50 disabled:cursor-not-allowed"
           />
-        ) : (
-          <span className="text-xs tabular-nums font-semibold px-2">{capR}</span>
-        )}
-      </td>
-    );
-  }
-  if (view === "capacity") {
-    return (
-      <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
-        {cap.toFixed(2)}
-      </td>
-    );
-  }
-  if (view === "resultado") {
-    const val = res;
-    if (val > 0) {
-      // Positive surplus -> dynamic green gradient background
-      const intensity = Math.min(val / 10, 1.0);
-      const alpha = 0.08 + intensity * 0.35; // ranges from 0.08 to 0.43 opacity
-      return (
-        <td
-          style={{ backgroundColor: `rgba(16, 185, 129, ${alpha})` }}
-          className="px-3 py-1.5 text-right text-xs font-semibold tabular-nums text-emerald-800 dark:text-emerald-300 transition-colors duration-150"
-        >
-          {val.toFixed(2)}
         </td>
       );
     }
-    if (val < 0) {
-      // Negative deficit -> dynamic red gradient background
-      const intensity = Math.min(Math.abs(val) / 10, 1.0);
-      const alpha = 0.08 + intensity * 0.35; // ranges from 0.08 to 0.43 opacity
+    if (view === "capacityR") {
       return (
-        <td
-          style={{ backgroundColor: `rgba(239, 68, 68, ${alpha})` }}
-          className="px-3 py-1.5 text-right text-xs font-semibold tabular-nums text-rose-800 dark:text-rose-300 transition-colors duration-150"
-        >
-          {val.toFixed(2)}
+        <td className="px-2 py-1 text-right">
+          {isEditableCapR ? (
+            <input
+              type="number"
+              step="1"
+              value={capR}
+              disabled={isReadOnly}
+              className="w-16 rounded-md border bg-background px-2 py-0.5 text-right text-xs tabular-nums focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring/40 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          ) : (
+            <span className="text-xs tabular-nums font-semibold px-2">{capR}</span>
+          )}
         </td>
       );
     }
-    return (
-      <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground/50">0.00</td>
-    );
-  }
+    if (view === "capacity") {
+      return (
+        <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
+          {cap.toFixed(2)}
+        </td>
+      );
+    }
+    if (view === "resultado") {
+      const val = res;
+      if (val > 0) {
+        // Positive surplus -> dynamic green gradient background
+        const intensity = Math.min(val / 10, 1.0);
+        const alpha = 0.08 + intensity * 0.35; // ranges from 0.08 to 0.43 opacity
+        return (
+          <td
+            style={{ backgroundColor: `rgba(16, 185, 129, ${alpha})` }}
+            className="px-3 py-1.5 text-right text-xs font-semibold tabular-nums text-emerald-800 dark:text-emerald-300 transition-colors duration-150"
+          >
+            {val.toFixed(2)}
+          </td>
+        );
+      }
+      if (val < 0) {
+        // Negative deficit -> dynamic red gradient background
+        const intensity = Math.min(Math.abs(val) / 10, 1.0);
+        const alpha = 0.08 + intensity * 0.35; // ranges from 0.08 to 0.43 opacity
+        return (
+          <td
+            style={{ backgroundColor: `rgba(239, 68, 68, ${alpha})` }}
+            className="px-3 py-1.5 text-right text-xs font-semibold tabular-nums text-rose-800 dark:text-rose-300 transition-colors duration-150"
+          >
+            {val.toFixed(2)}
+          </td>
+        );
+      }
+      return (
+        <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground/50">
+          0.00
+        </td>
+      );
+    }
 
-  // Faltam or Agentes p/ Whats
-  const f = view === "faltam20" ? f20 : f10;
+    // Faltam or Agentes p/ Whats
+    const f = f10;
 
-  if (view === "faltam10" && isWebchat) {
-    // "Agentes para o Whatsapp" - Positive release badge (light green)
+    if (view === "faltam10" && isWebchat) {
+      // "Agentes para o Whatsapp" - Positive release badge (light green)
+      return (
+        <td className="px-2 py-1 text-right">
+          {f > 0 ? (
+            <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+              {f}
+            </span>
+          ) : (
+            <span className="inline-flex min-w-[2rem] justify-center rounded border border-zinc-300 dark:border-zinc-700 bg-muted/20 px-2 py-0.5 text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
+              0
+            </span>
+          )}
+        </td>
+      );
+    }
+
     return (
       <td className="px-2 py-1 text-right">
         {f > 0 ? (
+          <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-destructive/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-destructive animate-pulse">
+            {f}
+          </span>
+        ) : f < 0 ? (
           <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
             {f}
           </span>
@@ -587,36 +674,17 @@ const ValueCell = React.memo(
         )}
       </td>
     );
-  }
-
-  return (
-    <td className="px-2 py-1 text-right">
-      {f > 0 ? (
-        <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-destructive/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-destructive animate-pulse">
-          {f}
-        </span>
-      ) : f < 0 ? (
-        <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-          {f}
-        </span>
-      ) : (
-        <span className="inline-flex min-w-[2rem] justify-center rounded border border-zinc-300 dark:border-zinc-700 bg-muted/20 px-2 py-0.5 text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
-          0
-        </span>
-      )}
-    </td>
-  );
-},
-(prev, next) => {
-  return (
-    prev.view === next.view &&
-    prev.vol === next.vol &&
-    prev.cap === next.cap &&
-    prev.capR === next.capR &&
-    prev.res === next.res &&
-    prev.f10 === next.f10 &&
-    prev.f20 === next.f20 &&
-    prev.isEditableCapR === next.isEditableCapR &&
-    prev.isWebchat === next.isWebchat
-  );
-});
+  },
+  (prev, next) => {
+    return (
+      prev.view === next.view &&
+      prev.vol === next.vol &&
+      prev.cap === next.cap &&
+      prev.capR === next.capR &&
+      prev.res === next.res &&
+      prev.f10 === next.f10 &&
+      prev.isEditableCapR === next.isEditableCapR &&
+      prev.isWebchat === next.isWebchat
+    );
+  },
+);

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { matchAgentName } from "@/lib/agents";
 import { useDimensionamento, Day, TeamAgent } from "@/context/DimensionamentoContext";
 import { DaySelector } from "@/components/DaySelector";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const SHIFT_HOURS = 8;
 
@@ -28,6 +29,7 @@ export function AgentCapacity() {
   const capacityAgents = useDimensionamento((s) => s.capacityAgents);
   const updateCapacityAgent = useDimensionamento((s) => s.updateCapacityAgent);
   const resetAll = useDimensionamento((s) => s.resetAll);
+  const isReadOnly = useDimensionamento((s) => s.isReadOnly);
   const teamAgents = useDimensionamento((s) => s.teamAgents);
   const currentMonth = useDimensionamento((s) => s.currentMonth);
   const refreshCurrentMonth = useDimensionamento((s) => s.refreshCurrentMonth);
@@ -72,7 +74,7 @@ export function AgentCapacity() {
   const supportRow = rows.find((r) => r.name === "Yooga Suporte");
   const aiRow = rows.find((r) => r.name === "Care AI");
 
-  // Dynamically map active team agents to capacity humanRows, defaulting mediaTri to 1500
+  // Dynamically map active team agents to capacity humanRows, defaulting mediaTri to 750
   const humanRows = useMemo(() => {
     return teamAgents
       .filter((agent) => {
@@ -86,7 +88,7 @@ export function AgentCapacity() {
       })
       .map((agent) => {
         const capMatch = capacityAgents.find((ca) => matchAgentName(ca.name, agent.name));
-        const mediaTri = capMatch ? capMatch.mediaTri : 1500;
+        const mediaTri = capMatch ? capMatch.mediaTri : 750;
         return {
           name: agent.name,
           mediaTri,
@@ -108,7 +110,15 @@ export function AgentCapacity() {
 
   // Total active human agents in the entire team roster (constant across days)
   const totalTeamAgentsCount = useMemo(() => {
-    return teamAgents.filter((a) => a.active).length;
+    return teamAgents.filter((agent) => {
+      if (!agent.active) return false;
+      const nameNorm = agent.name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+      return nameNorm !== "yooga suporte" && nameNorm !== "care ai" && nameNorm !== "care ia";
+    }).length;
   }, [teamAgents]);
 
   // Divisor dynamically switches between total team count (for Visão Geral) and daily count (for specific days)
@@ -233,8 +243,9 @@ export function AgentCapacity() {
             <>
               {/* Capsule 1: Capacity */}
               <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
-                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-                  Capacity
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-center gap-0.5">
+                  Capacity{" "}
+                  <Tooltip content="Capacidade média de conversas resolvidas por hora por analista humano." />
                 </span>
                 <div className="text-xl font-bold text-foreground mt-1 font-mono tracking-tight">
                   {fmtNum(currentCapacity, 2)}
@@ -242,8 +253,9 @@ export function AgentCapacity() {
               </div>
               {/* Capsule 2: Capacity/Tag */}
               <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
-                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-                  Capacity/Tag
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-center gap-0.5">
+                  Capacity/Tag{" "}
+                  <Tooltip content="Capacidade média do analista dividida considerando a equipe total mais o Suporte Yooga e a IA." />
                 </span>
                 <div className="text-xl font-bold text-foreground mt-1 font-mono tracking-tight">
                   {fmtNum(currentCapacityTag, 2)}
@@ -251,8 +263,9 @@ export function AgentCapacity() {
               </div>
               {/* Capsule 3: Capacity/20min */}
               <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
-                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-                  Capacity/20min
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-center gap-0.5">
+                  Capacity/20min{" "}
+                  <Tooltip content="Capacidade média calculada em blocos de 20 minutos (usada no WhatsApp)." />
                 </span>
                 <div className="text-xl font-bold text-foreground mt-1 font-mono tracking-tight">
                   {fmtNum(currentCapacity20min, 2)}
@@ -262,8 +275,9 @@ export function AgentCapacity() {
           )}
           {/* Capsule 4: Capacity/Webchat */}
           <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
-            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-              Capacity/Webchat
+            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-center gap-0.5">
+              Capacity/Webchat{" "}
+              <Tooltip content="Capacidade média resolvida em blocos de 10 minutos para Webchat." />
             </span>
             <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono tracking-tight">
               {fmtNum(currentCapacityWebchat, 2)}
@@ -271,8 +285,9 @@ export function AgentCapacity() {
           </div>
           {/* Capsule 5: Capacity/Whats */}
           <div className="bg-muted/40 border border-border/80 rounded-lg p-3 text-center">
-            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-              Capacity/Whats
+            <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center justify-center gap-0.5">
+              Capacity/Whats{" "}
+              <Tooltip content="Capacidade média resolvida em blocos de 10 minutos para WhatsApp." />
             </span>
             <div className="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1 font-mono tracking-tight">
               {fmtNum(currentCapacityWhats, 2)}
@@ -293,7 +308,7 @@ export function AgentCapacity() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleFreshchatSync}
-                disabled={isSyncing}
+                disabled={isSyncing || isReadOnly}
                 className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
@@ -301,7 +316,8 @@ export function AgentCapacity() {
               </button>
               <button
                 onClick={resetAll}
-                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                disabled={isReadOnly}
+                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <RotateCcw className="h-3 w-3" /> Restaurar valores
               </button>
@@ -342,7 +358,8 @@ export function AgentCapacity() {
                         const v = Number(e.target.value) || 0;
                         updateCapacityAgent(r.name, v);
                       }}
-                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold"
+                      disabled={isReadOnly}
+                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </td>
                   <Td>{fmtNum(r.mediaMes, 1)}</Td>
@@ -373,7 +390,8 @@ export function AgentCapacity() {
                         const v = Number(e.target.value) || 0;
                         updateCapacityAgent(supportRow.name, v);
                       }}
-                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold"
+                      disabled={isReadOnly}
+                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </td>
                   <Td>{fmtNum(supportRow.mediaMes, 1)}</Td>
@@ -395,7 +413,8 @@ export function AgentCapacity() {
                         const v = Number(e.target.value) || 0;
                         updateCapacityAgent(aiRow.name, v);
                       }}
-                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold"
+                      disabled={isReadOnly}
+                      className="w-24 border bg-background px-2 py-1 text-right tabular-nums focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </td>
                   <Td>{fmtNum(aiRow.mediaMes, 1)}</Td>

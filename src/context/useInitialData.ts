@@ -22,21 +22,18 @@ export function useInitialData() {
   const initialData = useMemo(() => {
     const webchatVolumes: Record<string, Record<Day, number>> = {};
     const whatsappVolumes: Record<string, Record<Day, number>> = {};
-    const agentsScheduled: Record<string, Record<Day, number>> = {};
 
     timeBlocks.forEach((time) => {
       webchatVolumes[time] = {} as Record<Day, number>;
       whatsappVolumes[time] = {} as Record<Day, number>;
-      agentsScheduled[time] = {} as Record<Day, number>;
 
       DAYS.forEach((day) => {
         webchatVolumes[time][day] = 0;
         whatsappVolumes[time][day] = 0;
-        agentsScheduled[time][day] = 0;
       });
     });
 
-    return { webchatVolumes, whatsappVolumes, agentsScheduled };
+    return { webchatVolumes, whatsappVolumes };
   }, [timeBlocks]);
 
   const initialCapacityAgents = useMemo(() => {

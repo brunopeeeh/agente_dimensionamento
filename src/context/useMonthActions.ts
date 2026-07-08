@@ -1,6 +1,13 @@
 import { useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { DAYS, type Day, type TeamAgent, type CapacityAgent, type NewAgentHire, type ScenarioParams } from "./types";
+import {
+  DAYS,
+  type Day,
+  type TeamAgent,
+  type CapacityAgent,
+  type NewAgentHire,
+  type ScenarioParams,
+} from "./types";
 
 type CreateMonthParams = {
   timeBlocks: string[];
@@ -45,7 +52,13 @@ export function useMonthActions(
         setIsLoading(false);
       }
     },
-    [getSnapshot, saveMonthDataToSupabase, loadMonthDataFromSupabase, setCurrentMonth, setIsLoading],
+    [
+      getSnapshot,
+      saveMonthDataToSupabase,
+      loadMonthDataFromSupabase,
+      setCurrentMonth,
+      setIsLoading,
+    ],
   );
 
   const refreshCurrentMonth = useCallback(async () => {
@@ -125,7 +138,7 @@ export function useMonthActions(
 
         if (monthsError) throw monthsError;
 
-        const updatedMonths = monthsData.map((m: any) => m.nome);
+        const updatedMonths = monthsData.map((m: { nome: string }) => m.nome);
         setAvailableMonths(updatedMonths);
         setCurrentMonth(newMonthName);
         setWebchatVolumes(emptyWcVolumes);
@@ -136,7 +149,15 @@ export function useMonthActions(
         setIsLoading(false);
       }
     },
-    [getSnapshot, saveMonthDataToSupabase, setIsLoading, setAvailableMonths, setCurrentMonth, setWebchatVolumes, setWhatsappVolumes],
+    [
+      getSnapshot,
+      saveMonthDataToSupabase,
+      setIsLoading,
+      setAvailableMonths,
+      setCurrentMonth,
+      setWebchatVolumes,
+      setWhatsappVolumes,
+    ],
   );
 
   return { changeActiveMonth, createNewMonth, refreshCurrentMonth };

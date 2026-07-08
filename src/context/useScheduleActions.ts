@@ -44,8 +44,7 @@ export function useScheduleActions(
                     getLunchEndTime(hire.lunch_start_time),
                   );
                 const isWorking =
-                  hire.days.includes(day) &&
-                  isTimeInShift(block, hire.start_time, hire.end_time);
+                  hire.days.includes(day) && isTimeInShift(block, hire.start_time, hire.end_time);
                 if (isLunch) {
                   intervals[block] = "pausa";
                 } else if (isWorking) {
@@ -137,6 +136,12 @@ export function useScheduleActions(
           if (externalStart && externalDurationMin && externalDurationMin > 0) {
             const [extH, extM] = externalStart.split(":").map(Number);
             extStartMin = extH * 60 + extM;
+            // If the shift wraps past midnight and the external time is "earlier"
+            // than the shift start, it refers to the post-midnight portion of this
+            // same shift (e.g. shift 18:00-03:00 with external at 02:00).
+            if (endMin >= 24 * 60 && extStartMin < startMin) {
+              extStartMin += 24 * 60;
+            }
             extEndMin = extStartMin + externalDurationMin;
           }
 
@@ -151,26 +156,8 @@ export function useScheduleActions(
 
             if (t >= lunchStartMin && t < lunchEndMin) {
               status = "pausa";
-            } else if (extStartMin !== -1) {
-              let isExternal = false;
-              let checkExtEnd = extEndMin;
-              const checkT = t;
-              if (extEndMin < extStartMin) {
-                checkExtEnd += 24 * 60;
-              }
-              if (
-                checkT < extStartMin &&
-                checkT + 24 * 60 >= extStartMin &&
-                checkT + 24 * 60 < checkExtEnd
-              ) {
-                isExternal = true;
-              } else if (checkT >= extStartMin && checkT < checkExtEnd) {
-                isExternal = true;
-              }
-
-              if (isExternal) {
-                status = "externo";
-              }
+            } else if (extStartMin !== -1 && t >= extStartMin && t < extEndMin) {
+              status = "externo";
             }
 
             intervals[timeStr] = status;

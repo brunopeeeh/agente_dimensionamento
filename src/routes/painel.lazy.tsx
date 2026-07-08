@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, type ComponentType } from "react";
 import {
@@ -6,21 +5,26 @@ import {
   BarChart,
   CartesianGrid,
   ResponsiveContainer,
-  Tooltip,
-  XAxis,
   YAxis,
   ReferenceLine,
+  Tooltip,
+  XAxis,
 } from "recharts";
 import { useDimensionamento, DAYS, Day } from "@/context/DimensionamentoContext";
 import { DaySelector } from "@/components/DaySelector";
-import { AlertTriangle, CheckCircle2, Gauge, Users, RotateCcw } from "lucide-react";
+import { estimateAgentsNeeded } from "@/lib/optimization/solver";
+import { AlertTriangle, CheckCircle2, Users, RotateCcw } from "lucide-react";
+
+// Parallel to DAYS (Segunda..Domingo) — short codes expected by the solver's deficit table.
+const DAY_SHORT_CODES = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
 
 export const Route = createLazyFileRoute("/painel")({
   component: Painel,
 });
 
 function Painel() {
-  const { rowCalculations, kpis, currentMonth, resetAll } = useDimensionamento();
+  const { rowCalculations, kpis, currentMonth, resetAll, teamAgents, isReadOnly } =
+    useDimensionamento();
 
   const [chartDay, setChartDay] = useState<Day>("Segunda");
 
@@ -30,10 +34,24 @@ function Painel() {
       .filter((r) => r.time === "00:00" || (r.time >= "07:00" && r.time <= "23:50"))
       .map((r) => ({
         time: r.time,
-        waResultado: Number(((r as any).waResultado?.[dIdx] ?? 0).toFixed(2)),
-        prResultado: Number(((r as any).prResultado?.[dIdx] ?? 0).toFixed(2)),
+        waResultado: Number((r.waResultado[dIdx] ?? 0).toFixed(2)),
+        prResultado: Number((r.prResultado[dIdx] ?? 0).toFixed(2)),
       }));
   }, [rowCalculations, chartDay]);
+
+  // Greedy estimate of how many agents are needed to zero out the whole week's
+  // WhatsApp deficit — same shift/folga rules as the math solver in Contratações,
+  // but cheap enough to recompute on every edit (see estimateAgentsNeeded docs).
+  const agentesRecomendados = useMemo(() => {
+    const deficitTable = rowCalculations.map((r) => {
+      const row: Record<string, number | string> = { start: r.time };
+      DAY_SHORT_CODES.forEach((code, dIdx) => {
+        row[code] = r.waFaltam10[dIdx] ?? 0;
+      });
+      return row;
+    });
+    return estimateAgentsNeeded({ deficitTable });
+  }, [rowCalculations]);
 
   return (
     <div className="space-y-6">
@@ -52,7 +70,8 @@ function Painel() {
           </div>
           <button
             onClick={resetAll}
-            className="self-start inline-flex items-center gap-1.5 rounded-lg border bg-background px-3.5 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-all cursor-pointer"
+            disabled={isReadOnly}
+            className="self-start inline-flex items-center gap-1.5 rounded-lg border bg-background px-3.5 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             title="Restaurar dados originais de Fev/26"
           >
             <RotateCcw className="h-3.5 w-3.5" /> Restaurar Padrão
@@ -71,17 +90,17 @@ function Painel() {
           <KpiCard
             icon={Users}
             label="Agentes Recomendados"
-            value={kpis.picoMaximo.deficit.toString()}
-            hint="Necessários para zerar a semana"
+            value={agentesRecomendados.toString()}
+            hint="Estimativa para zerar a semana"
             color="text-primary bg-primary/10"
           />
           <KpiCard
-            icon={Gauge}
-            label="Desperdício de Escala"
-            value={`${Math.round(kpis.horasOciosas)} horas`}
-            hint="Horas ociosas (sobra de agentes)"
-            color="text-warning bg-warning/10"
-            tone={kpis.horasOciosas > 20 ? "warn" : "good"}
+            icon={Users}
+            label="Tamanho da Equipe"
+            value={`${teamAgents.filter((a) => a.active).length} ativos`}
+            hint="Total de analistas disponíveis na escala"
+            color="text-indigo-600 bg-indigo-600/10 dark:text-indigo-400 dark:bg-indigo-400/10"
+            tone="neutral"
           />
           <KpiCard
             icon={CheckCircle2}
@@ -89,7 +108,13 @@ function Painel() {
             value={`${kpis.coberturaProjetada.toFixed(1)}%`}
             hint="Fluxo total coberto pela equipe"
             color="text-success bg-success/10"
-            tone={kpis.coberturaProjetada >= 95 ? "good" : kpis.coberturaProjetada >= 85 ? "warn" : "bad"}
+            tone={
+              kpis.coberturaProjetada >= 95
+                ? "good"
+                : kpis.coberturaProjetada >= 85
+                  ? "warn"
+                  : "bad"
+            }
           />
         </div>
       </section>
@@ -98,7 +123,7 @@ function Painel() {
         <div className="grid gap-6 lg:grid-cols-2">
           <ChartCard
             title={`WhatsApp Original - ${chartDay}`}
-            subtitle="Defasagem de escala antes do simulador."
+            subtitle="Excedente ou déficit operacional antes do simulador."
             dotClass="bg-[#3b82f6]"
             chartDay={chartDay}
             setChartDay={setChartDay}
@@ -109,7 +134,7 @@ function Painel() {
           />
           <ChartCard
             title={`Prova Real (Simulado) - ${chartDay}`}
-            subtitle="Defasagem de escala após o simulador."
+            subtitle="Excedente ou déficit operacional após o simulador."
             dotClass="bg-[#10b981]"
             chartDay={chartDay}
             setChartDay={setChartDay}
@@ -245,7 +270,7 @@ function KpiCard({
   value: string;
   hint?: string;
   color?: string;
-  tone?: "good" | "bad" | "warn";
+  tone?: "good" | "bad" | "warn" | "neutral";
 }) {
   const valueColor =
     tone === "good"

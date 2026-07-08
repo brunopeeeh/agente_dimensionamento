@@ -19,6 +19,8 @@ import type {
   SaveStatus,
 } from "@/context/types";
 
+const INITIAL_TEAM_AGENTS: TeamAgent[] = [];
+
 export type MonthPersistenceSnapshot = {
   teamAgents: TeamAgent[];
   capacityAgents: CapacityAgent[];
@@ -226,7 +228,7 @@ export function useSupabasePersistence(
         }
 
         setters.setAvailableMonths(monthsList);
-        const targetMonth = monthsList.includes(currentMonth) ? currentMonth : monthsList[0];
+        const targetMonth = monthsList[monthsList.length - 1];
         setters.setCurrentMonth(targetMonth);
         await loadMonthDataFromSupabase(targetMonth);
       } catch (err) {

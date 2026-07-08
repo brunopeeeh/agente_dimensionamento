@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useState, useMemo, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { toast } from "sonner";
 import { matchAgentName } from "@/lib/agents";
 import { computeDynamicTmaFactors, computeGridCalculations } from "@/lib/calculations";
 import {
@@ -12,9 +12,7 @@ import {
   DEFAULT_TMA_FACTORS,
   DEFAULT_NEW_HIRES,
 } from "@/lib/constants";
-import {
-  useSupabasePersistence,
-} from "@/hooks/useSupabasePersistence";
+import { useSupabasePersistence } from "@/hooks/useSupabasePersistence";
 import { useInitialData } from "./useInitialData";
 import { useScheduleActions } from "./useScheduleActions";
 import { useDataImport } from "./useDataImport";
@@ -46,9 +44,11 @@ export type {
 } from "./types";
 export { DAYS } from "./types";
 
-import { createStore, useStore } from "zustand";
+import { createStore, useStore, type StoreApi } from "zustand";
 
-const DimensionamentoStoreContext = createContext<ReturnType<typeof createStore<DimensionamentoState>> | undefined>(undefined);
+const DimensionamentoStoreContext = createContext<StoreApi<DimensionamentoState> | undefined>(
+  undefined,
+);
 
 export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { timeBlocks, initialData, initialCapacityAgents } = useInitialData();
@@ -57,10 +57,11 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
   const [availableMonths, setAvailableMonths] = useState<string[]>(DEFAULT_MONTHS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
 
   const [webchatVolumes, setWebchatVolumes] = useState(initialData.webchatVolumes);
   const [whatsappVolumes, setWhatsappVolumes] = useState(initialData.whatsappVolumes);
-  const [, setAgentsScheduled] = useState(initialData.agentsScheduled);
 
   const [capacityAgents, setCapacityAgents] = useState<CapacityAgent[]>(() => {
     try {
@@ -181,16 +182,6 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
     }));
   };
 
-  const updateTimeBlockAgents = (time: string, day: Day, value: number) => {
-    setAgentsScheduled((prev) => ({
-      ...prev,
-      [time]: {
-        ...prev[time],
-        [day]: Math.max(0, Math.round(value)),
-      },
-    }));
-  };
-
   const updateTmaFactor = (day: Day, value: number) => {
     setTmaFactors((prev) => ({
       ...prev,
@@ -215,9 +206,7 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
 
   const toggleAgentActive = (agentId: string) => {
     setTeamAgents((prev) =>
-      prev.map((agent) =>
-        agent.id === agentId ? { ...agent, active: !agent.active } : agent,
-      ),
+      prev.map((agent) => (agent.id === agentId ? { ...agent, active: !agent.active } : agent)),
     );
   };
 
@@ -267,16 +256,78 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
   };
 
   const resetAll = () => {
-    setWebchatVolumes(initialData.webchatVolumes);
-    setWhatsappVolumes(initialData.whatsappVolumes);
-    setAgentsScheduled(initialData.agentsScheduled);
-    setTeamAgents([]);
-    setTmaFactors(DEFAULT_TMA_FACTORS);
-    setCapacityAgents(initialCapacityAgents);
-    setSimultaneousWC(DEFAULT_SIMULTANEOUS_WC);
-    setSimultaneousWA(DEFAULT_SIMULTANEOUS_WA);
-    setScenarios(DEFAULT_SCENARIO_PARAMS);
-    setNewHires(DEFAULT_NEW_HIRES);
+    setIsResetConfirmOpen(true);
+  };
+
+  const executeResetAll = async () => {
+    setIsResetConfirmOpen(false);
+    setIsLoading(true);
+
+    const client = supabase;
+    if (!client) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const { data: monthObj, error: monthError } = await client
+        .from("meses")
+        .select("id")
+        .eq("nome", currentMonth)
+        .single();
+
+      if (monthError) throw monthError;
+      const mesId = monthObj.id;
+
+      // Upsert default reset values to Supabase
+      await Promise.all([
+        client.from("escala_equipe").upsert(
+          {
+            mes_id: mesId,
+            team_agents: [],
+            capacity_agents: initialCapacityAgents,
+          },
+          { onConflict: "mes_id" },
+        ),
+        client.from("volumes_chamados").upsert(
+          {
+            mes_id: mesId,
+            webchat_volumes: initialData.webchatVolumes,
+            whatsapp_volumes: initialData.whatsappVolumes,
+          },
+          { onConflict: "mes_id" },
+        ),
+        client.from("parametros_operacionais").upsert(
+          {
+            mes_id: mesId,
+            tma_factors: DEFAULT_TMA_FACTORS,
+            simultaneous_wc: DEFAULT_SIMULTANEOUS_WC,
+            simultaneous_wa: DEFAULT_SIMULTANEOUS_WA,
+            scenarios: DEFAULT_SCENARIO_PARAMS,
+            new_hires: DEFAULT_NEW_HIRES,
+          },
+          { onConflict: "mes_id" },
+        ),
+      ]);
+
+      // Update React state after database confirmation
+      setWebchatVolumes(initialData.webchatVolumes);
+      setWhatsappVolumes(initialData.whatsappVolumes);
+      setTeamAgents([]);
+      setTmaFactors(DEFAULT_TMA_FACTORS);
+      setCapacityAgents(initialCapacityAgents);
+      setSimultaneousWC(DEFAULT_SIMULTANEOUS_WC);
+      setSimultaneousWA(DEFAULT_SIMULTANEOUS_WA);
+      setScenarios(DEFAULT_SCENARIO_PARAMS);
+      setNewHires(DEFAULT_NEW_HIRES);
+
+      toast.success("Valores restaurados com sucesso!");
+    } catch (err) {
+      console.error("Erro ao restaurar valores padrão:", err);
+      toast.error("Erro ao restaurar valores. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // ---- Schedule actions (extracted hook) ----
@@ -367,7 +418,6 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
     createNewMonth,
     refreshCurrentMonth,
     updateTimeBlockVolume,
-    updateTimeBlockAgents,
     updateTmaFactor,
     updateSimultaneous,
     toggleIntervalStatus,
@@ -379,6 +429,7 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
     updateScenario,
     updateCapacityAgent,
     resetAll,
+    executeResetAll,
     importPowerBIData,
     updateChannelVolumes,
   });
@@ -387,7 +438,6 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
     createNewMonth,
     refreshCurrentMonth,
     updateTimeBlockVolume,
-    updateTimeBlockAgents,
     updateTmaFactor,
     updateSimultaneous,
     toggleIntervalStatus,
@@ -399,6 +449,7 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
     updateScenario,
     updateCapacityAgent,
     resetAll,
+    executeResetAll,
     importPowerBIData,
     updateChannelVolumes,
   };
@@ -414,10 +465,7 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
         channel: "webchat" | "whatsapp",
         value: number,
       ) => actionsRef.current.updateTimeBlockVolume(time, day, channel, value),
-      updateTimeBlockAgents: (time: string, day: Day, value: number) =>
-        actionsRef.current.updateTimeBlockAgents(time, day, value),
-      updateTmaFactor: (day: Day, value: number) =>
-        actionsRef.current.updateTmaFactor(day, value),
+      updateTmaFactor: (day: Day, value: number) => actionsRef.current.updateTmaFactor(day, value),
       updateSimultaneous: (channel: "webchat" | "whatsapp", value: number) =>
         actionsRef.current.updateSimultaneous(channel, value),
       toggleIntervalStatus: (agentId: string, day: Day, time20: string) =>
@@ -450,6 +498,7 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
       updateCapacityAgent: (name: string, value: number) =>
         actionsRef.current.updateCapacityAgent(name, value),
       resetAll: () => actionsRef.current.resetAll(),
+      executeResetAll: () => actionsRef.current.executeResetAll(),
       importPowerBIData: (webchatCsv: string, whatsappCsv: string) =>
         actionsRef.current.importPowerBIData(webchatCsv, whatsappCsv),
       updateChannelVolumes: (
@@ -476,6 +525,10 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
       availableMonths,
       isLoading,
       saveStatus,
+      isReadOnly,
+      setIsReadOnly,
+      isResetConfirmOpen,
+      setIsResetConfirmOpen,
       ...stableActions,
       setTeamAgents,
       setNewHires,
@@ -495,18 +548,20 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
       availableMonths,
       isLoading,
       saveStatus,
+      isReadOnly,
+      isResetConfirmOpen,
       stableActions,
     ],
   );
 
-  const storeRef = useRef<ReturnType<typeof createStore<DimensionamentoState>>>();
+  const storeRef = useRef<StoreApi<DimensionamentoState>>(null!);
   if (!storeRef.current) {
-    storeRef.current = createStore<DimensionamentoState>(() => contextValue);
+    storeRef.current = createStore<DimensionamentoState>()(() => contextValue);
   }
 
   // Sync React state to Zustand store synchronously
   React.useLayoutEffect(() => {
-    storeRef.current?.setState(contextValue);
+    storeRef.current.setState(contextValue);
   }, [contextValue]);
 
   return (
@@ -516,12 +571,12 @@ export const DimensionamentoProvider: React.FC<{ children: React.ReactNode }> = 
   );
 };
 
-export function useDimensionamento<T = DimensionamentoState>(
-  selector?: (state: DimensionamentoState) => T,
-): T {
+export function useDimensionamento<T>(selector: (state: DimensionamentoState) => T): T;
+export function useDimensionamento(): DimensionamentoState;
+export function useDimensionamento<T>(selector?: (state: DimensionamentoState) => T) {
   const store = useContext(DimensionamentoStoreContext);
   if (!store) {
     throw new Error("useDimensionamento must be used within a DimensionamentoProvider");
   }
-  return useStore(store, selector ?? ((s) => s as unknown as T));
+  return useStore(store, selector!);
 }

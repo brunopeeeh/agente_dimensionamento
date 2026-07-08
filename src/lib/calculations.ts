@@ -8,13 +8,7 @@ import {
   BLOCKS_10MIN_PER_HOUR,
   DAYS_PER_WEEK,
 } from "@/lib/constants";
-import type {
-  Day,
-  TeamAgent,
-  NewAgentHire,
-  CapacityAgent,
-  RowCalculation,
-} from "@/context/types";
+import type { Day, TeamAgent, NewAgentHire, CapacityAgent, RowCalculation } from "@/context/types";
 
 export type DayTotals = {
   wcVolume: number;
@@ -91,28 +85,6 @@ function emptyDayArrays(): Pick<
 function createEmptyRowCalculation(time: string): RowCalculation {
   return {
     time,
-    webchat: {
-      volume: 0,
-      capacityRaw: 0,
-      capacityRounded: 0,
-      surplus: 0,
-      agentsForWhats: 0,
-    },
-    whatsapp: {
-      volume: 0,
-      capacityRaw: 0,
-      capacityRounded: 0,
-      surplus: 0,
-      agentsFaltantes10: 0,
-      agentsFaltantes20: 0,
-    },
-    provaReal: {
-      capacityRaw: 0,
-      capacityRounded: 0,
-      surplus: 0,
-      agentsFaltantes10: 0,
-      agentsFaltantes20: 0,
-    },
     ...emptyDayArrays(),
   };
 }
@@ -137,7 +109,9 @@ export function computeDynamicTmaFactors(
   capacityAgents: CapacityAgent[],
 ): Record<Day, number> {
   const supportMatch = capacityAgents.find((ca) => ca.name === "Yooga Suporte");
-  const supportResolvidos10 = deriveResolvidos10(supportMatch ? supportMatch.mediaTri : DEFAULT_MEDIA_TRI);
+  const supportResolvidos10 = deriveResolvidos10(
+    supportMatch ? supportMatch.mediaTri : DEFAULT_MEDIA_TRI,
+  );
 
   const aiMatch = capacityAgents.find((ca) => ca.name === "Care AI");
   const aiResolvidos10 = deriveResolvidos10(aiMatch ? aiMatch.mediaTri : DEFAULT_MEDIA_TRI);
@@ -337,7 +311,8 @@ export function computeGridCalculations(params: {
       excedenteTotal: totalSurplus,
       picoMaximo: { day: maxDeficitDay, time: maxDeficitTime, deficit: maxDeficit },
       horasOciosas: totalSurplus / 6, // each surplus is 1 agent idle for 10 min (1/6 hour)
-      coberturaProjetada: totalWaVolume > 0 ? ((totalWaVolume - totalWaDeficitChats) / totalWaVolume) * 100 : 100,
+      coberturaProjetada:
+        totalWaVolume > 0 ? ((totalWaVolume - totalWaDeficitChats) / totalWaVolume) * 100 : 100,
     },
   };
 }

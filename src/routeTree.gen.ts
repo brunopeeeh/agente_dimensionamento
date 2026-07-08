@@ -16,6 +16,7 @@ import { Route as PainelRouteImport } from './routes/painel'
 import { Route as EscalaRouteImport } from './routes/escala'
 import { Route as ContratacoesRouteImport } from './routes/contratacoes'
 import { Route as CapacidadeRouteImport } from './routes/capacidade'
+import { Route as CalculadoraAnualRouteImport } from './routes/calculadora-anual'
 import { Route as IndexRouteImport } from './routes/index'
 
 const WhatsappRoute = WhatsappRouteImport.update({
@@ -55,6 +56,13 @@ const CapacidadeRoute = CapacidadeRouteImport.update({
   path: '/capacidade',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/capacidade.lazy').then((d) => d.Route))
+const CalculadoraAnualRoute = CalculadoraAnualRouteImport.update({
+  id: '/calculadora-anual',
+  path: '/calculadora-anual',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/calculadora-anual.lazy').then((d) => d.Route),
+)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -63,6 +71,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/calculadora-anual': typeof CalculadoraAnualRoute
   '/capacidade': typeof CapacidadeRoute
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
@@ -73,6 +82,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/calculadora-anual': typeof CalculadoraAnualRoute
   '/capacidade': typeof CapacidadeRoute
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
@@ -84,6 +94,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/calculadora-anual': typeof CalculadoraAnualRoute
   '/capacidade': typeof CapacidadeRoute
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/calculadora-anual'
     | '/capacidade'
     | '/contratacoes'
     | '/escala'
@@ -106,6 +118,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/calculadora-anual'
     | '/capacidade'
     | '/contratacoes'
     | '/escala'
@@ -116,6 +129,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/calculadora-anual'
     | '/capacidade'
     | '/contratacoes'
     | '/escala'
@@ -127,6 +141,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CalculadoraAnualRoute: typeof CalculadoraAnualRoute
   CapacidadeRoute: typeof CapacidadeRoute
   ContratacoesRoute: typeof ContratacoesRoute
   EscalaRoute: typeof EscalaRoute
@@ -187,6 +202,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CapacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/calculadora-anual': {
+      id: '/calculadora-anual'
+      path: '/calculadora-anual'
+      fullPath: '/calculadora-anual'
+      preLoaderRoute: typeof CalculadoraAnualRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -199,6 +221,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CalculadoraAnualRoute: CalculadoraAnualRoute,
   CapacidadeRoute: CapacidadeRoute,
   ContratacoesRoute: ContratacoesRoute,
   EscalaRoute: EscalaRoute,

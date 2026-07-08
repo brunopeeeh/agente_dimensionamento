@@ -9,6 +9,14 @@ import { SiteNav } from "@/components/SiteNav";
 import { Sidebar } from "@/components/Sidebar";
 import { DimensionamentoProvider, useDimensionamento } from "../context/DimensionamentoContext";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 
 function NotFoundComponent() {
@@ -104,29 +112,67 @@ function RootComponent() {
 }
 
 function RootLayoutContent() {
-  const { isLoading } = useDimensionamento();
-  
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("sidebar-collapsed") === "true";
+  const { isLoading, isResetConfirmOpen, setIsResetConfirmOpen, executeResetAll } =
+    useDimensionamento();
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved === "true") {
+      setIsSidebarCollapsed(true);
     }
-    return false;
-  });
-  
+  }, []);
+
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem("sidebar-collapsed", String(isSidebarCollapsed));
-  }, [isSidebarCollapsed]);
+    if (isMounted) {
+      localStorage.setItem("sidebar-collapsed", String(isSidebarCollapsed));
+    }
+  }, [isSidebarCollapsed, isMounted]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background relative">
       <SiteNav onOpenMobile={() => setIsMobileOpen(true)} />
       <Toaster />
-      
+
+      <Dialog open={isResetConfirmOpen} onOpenChange={setIsResetConfirmOpen}>
+        <DialogContent className="max-w-md border-border bg-card p-6 shadow-2xl rounded-xl animate-in zoom-in-95 duration-200">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-foreground uppercase tracking-wide flex items-center gap-2">
+              ⚠️ Restaurar Originais
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-2">
+              Tem certeza que deseja restaurar os valores padrão?
+              <span className="block mt-1.5 font-semibold text-rose-500 dark:text-rose-400">
+                Esta ação apagará todos os dados do período atual (equipe, volumes importados,
+                capacities e parâmetros operacionais) e não poderá ser desfeita.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-2">
+            <button
+              onClick={() => setIsResetConfirmOpen(false)}
+              className="flex-1 rounded-lg border border-border bg-background py-2 text-xs font-semibold hover:bg-accent transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={executeResetAll}
+              className="flex-1 rounded-lg bg-destructive text-destructive-foreground py-2 text-xs font-bold hover:bg-destructive/90 transition-colors cursor-pointer"
+            >
+              Sim, Restaurar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-1">
-        <Sidebar 
-          isCollapsed={isSidebarCollapsed} 
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           isMobileOpen={isMobileOpen}
           onCloseMobile={() => setIsMobileOpen(false)}

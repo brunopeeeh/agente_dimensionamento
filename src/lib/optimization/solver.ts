@@ -1,4 +1,8 @@
-import type { AiSuggestionRequest, AiSuggestionResponse, AiAgentSuggestion } from "../api/ai-agent.server";
+import type {
+  AiSuggestionRequest,
+  AiSuggestionResponse,
+  AiAgentSuggestion,
+} from "../api/ai-agent.server";
 
 const VALID_SHIFTS: ReadonlyArray<readonly [string, string]> = [
   ["07:00", "16:00"], // index 0
@@ -26,10 +30,10 @@ function timeToIndex(time: string): number {
   return h * 6 + Math.floor(m / 10);
 }
 
-export function runMathSuggestion(req: AiSuggestionRequest): AiSuggestionResponse {
+function buildDeficitArray(deficitTable: AiSuggestionRequest["deficitTable"]): Float64Array[] {
   const deficit = Array.from({ length: 7 }, () => new Float64Array(144));
 
-  for (const row of req.deficitTable) {
+  for (const row of deficitTable) {
     if (!row.start) continue;
     const idx = timeToIndex(String(row.start));
     for (let d = 0; d < 7; d++) {
@@ -38,17 +42,21 @@ export function runMathSuggestion(req: AiSuggestionRequest): AiSuggestionRespons
     }
   }
 
-  type Profile = {
-    shiftIndex: number;
-    comboIndex: number;
-    coverage: Float64Array[];
-  };
+  return deficit;
+}
 
+type Profile = {
+  shiftIndex: number;
+  comboIndex: number;
+  coverage: Float64Array[];
+};
+
+function buildProfiles(): Profile[] {
   const profiles: Profile[] = [];
   for (let s = 0; s < VALID_SHIFTS.length; s++) {
     const [start] = VALID_SHIFTS[s];
     const startIdx = timeToIndex(start);
-    
+
     // 9 hours = 54 blocks of 10 min
     const blocks = [];
     for (let i = 0; i < 54; i++) {
@@ -72,6 +80,82 @@ export function runMathSuggestion(req: AiSuggestionRequest): AiSuggestionRespons
       });
     }
   }
+  return profiles;
+}
+
+/**
+ * Fast greedy estimate of how many agents (1..maxAgents) are needed to cover
+ * the whole deficit table, instead of the exact-4 combinatorial search used by
+ * runMathSuggestion. At each step it picks the single valid shift+folga profile
+ * that removes the most residual deficit, respecting the max-2-per-folga rule,
+ * until the residual deficit reaches zero or maxAgents is hit.
+ *
+ * This is an approximation (greedy set-cover), not the globally optimal count —
+ * but it's ~5000x cheaper than the exact search, which is required to keep it
+ * safe to recompute on every keystroke (e.g. a KPI card on the dashboard).
+ */
+export function estimateAgentsNeeded(
+  req: { deficitTable: AiSuggestionRequest["deficitTable"] },
+  maxAgents = 6,
+): number {
+  const deficit = buildDeficitArray(req.deficitTable);
+  const profiles = buildProfiles();
+
+  const residual = deficit.map((day) => Float64Array.from(day));
+  const folgaCounts = new Int8Array(VALID_DAY_OFF_COMBOS.length);
+
+  const residualTotal = () => {
+    let sum = 0;
+    for (let d = 0; d < 7; d++) {
+      for (let b = 0; b < 144; b++) {
+        if (residual[d][b] > 0) sum += residual[d][b];
+      }
+    }
+    return sum;
+  };
+
+  let chosen = 0;
+  while (chosen < maxAgents && residualTotal() > 0) {
+    let bestIdx = -1;
+    let bestCovered = 0;
+
+    for (let p = 0; p < profiles.length; p++) {
+      if (folgaCounts[profiles[p].comboIndex] >= 2) continue; // Rule 6: max 2 agents per folga combo
+
+      let covered = 0;
+      const { coverage } = profiles[p];
+      for (let d = 0; d < 7; d++) {
+        for (let b = 0; b < 144; b++) {
+          if (coverage[d][b] > 0 && residual[d][b] > 0) {
+            covered += Math.min(residual[d][b], coverage[d][b]);
+          }
+        }
+      }
+
+      if (covered > bestCovered) {
+        bestCovered = covered;
+        bestIdx = p;
+      }
+    }
+
+    if (bestIdx === -1) break; // no remaining profile can cover any more deficit
+
+    const picked = profiles[bestIdx];
+    for (let d = 0; d < 7; d++) {
+      for (let b = 0; b < 144; b++) {
+        residual[d][b] = Math.max(0, residual[d][b] - picked.coverage[d][b]);
+      }
+    }
+    folgaCounts[picked.comboIndex]++;
+    chosen++;
+  }
+
+  return chosen;
+}
+
+export function runMathSuggestion(req: AiSuggestionRequest): AiSuggestionResponse {
+  const deficit = buildDeficitArray(req.deficitTable);
+  const profiles = buildProfiles();
 
   let bestScore = Infinity;
   let bestCombination: number[] = [];
@@ -82,7 +166,10 @@ export function runMathSuggestion(req: AiSuggestionRequest): AiSuggestionRespons
     for (let j = i; j < P; j++) {
       for (let k = j; k < P; k++) {
         for (let l = k; l < P; l++) {
-          const p1 = profiles[i], p2 = profiles[j], p3 = profiles[k], p4 = profiles[l];
+          const p1 = profiles[i],
+            p2 = profiles[j],
+            p3 = profiles[k],
+            p4 = profiles[l];
 
           // Rule 6: Max 2 agents with the same folga combo
           const comboCounts = new Int8Array(VALID_DAY_OFF_COMBOS.length);

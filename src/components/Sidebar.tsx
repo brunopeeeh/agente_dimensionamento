@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Activity,
   Users,
   MessageSquare,
   MessageCircle,
@@ -8,13 +7,13 @@ import {
   BarChart3,
   Calendar,
   CalendarCheck,
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   X,
 } from "lucide-react";
 
 export const NAVIGATION_ITEMS = [
-  { to: "/", label: "Visão Geral", icon: Activity },
   { to: "/painel", label: "Painel", icon: BarChart3 },
   { to: "/escala", label: "Gestão de Escalas", icon: Calendar },
   { to: "/previsao-escala", label: "Previsão da Escala", icon: CalendarCheck },
@@ -22,6 +21,7 @@ export const NAVIGATION_ITEMS = [
   { to: "/webchat", label: "Webchat", icon: MessageSquare },
   { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/contratacoes", label: "Prova Real", icon: ClipboardCheck },
+  { to: "/calculadora-anual", label: "Calculadora Anual", icon: CalendarRange },
 ] as const;
 
 type SidebarProps = {

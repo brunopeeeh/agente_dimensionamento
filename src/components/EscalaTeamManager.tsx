@@ -25,7 +25,7 @@ import {
   SHIFT_PRESETS,
   generateTimeBlocks20,
 } from "@/components/escala/constants";
-import { RotateCcw, Plus, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 
 interface EscalaTeamManagerProps {
   showSimulated?: boolean;
@@ -233,54 +233,30 @@ export function EscalaTeamManager({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-none border border-border bg-card p-5 shadow-sm">
-        <div className="flex flex-wrap gap-2">
+      <div className="rounded-none border border-border bg-card px-5 pt-5 shadow-sm">
+        <div className="flex flex-wrap justify-between items-end border-b border-border gap-4">
+          <DaySelector
+            value={activeTab}
+            onChange={(day) => {
+              if (day === "Todos") return;
+              setActiveTab(day);
+              setActiveDay(day);
+            }}
+            variant="tab"
+            className=""
+            getBadge={countActiveOnDay}
+            extraTabs={EXTRA_TABS.map((tab) => ({ id: tab, label: tab }))}
+            onExtraTabSelect={(id) => setActiveTab(id as EscalaTab)}
+          />
+
           <button
             onClick={() => setIsConfigOpen(true)}
-            className="inline-flex items-center gap-1.5 border border-border bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:scale-[1.02] active:scale-[0.98] transition-all rounded-none"
+            className="inline-flex items-center gap-1.5 border border-border border-b-transparent bg-background/50 px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all rounded-t-md mb-[0px]"
             title="Configurar presets e analistas"
           >
             <SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> Configurar Escala
           </button>
-
-          <button
-            onClick={resetAll}
-            className="inline-flex items-center gap-1.5 border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:scale-[1.02] active:scale-[0.98] transition-all rounded-none"
-          >
-            <RotateCcw className="h-3 w-3" /> Restaurar Originais
-          </button>
-
-          <form onSubmit={handleAddAgent} className="flex gap-2">
-            <input
-              type="text"
-              required
-              value={newAgentName}
-              onChange={(e) => setNewAgentName(e.target.value)}
-              placeholder="Nome do analista..."
-              className="bg-background border border-border text-xs px-3 py-1.5 focus:outline-none focus:border-primary rounded-none"
-            />
-            <button
-              type="submit"
-              className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5 hover:bg-primary/95 transition-all rounded-none hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Plus className="h-3.5 w-3.5" /> Adicionar Analista
-            </button>
-          </form>
         </div>
-
-        <DaySelector
-          value={activeTab}
-          onChange={(day) => {
-            if (day === "Todos") return;
-            setActiveTab(day);
-            setActiveDay(day);
-          }}
-          variant="tab"
-          className="mt-6 border-b border-border pb-1"
-          getBadge={countActiveOnDay}
-          extraTabs={EXTRA_TABS.map((tab) => ({ id: tab, label: tab }))}
-          onExtraTabSelect={(id) => setActiveTab(id as EscalaTab)}
-        />
       </div>
 
       {activeTab === "Agente dia" ? (
@@ -351,6 +327,10 @@ export function EscalaTeamManager({
         onToggleAgentActive={toggleAgentActive}
         onRemoveTeamAgent={removeTeamAgent}
         onClearAgentDay={handleClearAgentDay}
+        onResetAll={resetAll}
+        newAgentName={newAgentName}
+        onNewAgentNameChange={setNewAgentName}
+        onAddAgent={handleAddAgent}
       />
     </div>
   );

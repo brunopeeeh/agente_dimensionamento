@@ -18,7 +18,8 @@ import { createHash } from "node:crypto";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
-const DASHSCOPE_URL_DEFAULT = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
+const DASHSCOPE_URL_DEFAULT =
+  "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
 const DEFAULT_MODEL = "deepseek-chat";
 const DASHSCOPE_DEFAULT_MODEL = "qwen3-max";
 const CACHE_TTL_HOURS = 24;
@@ -137,8 +138,7 @@ function getProvider(modelOverride?: string): ChatProvider {
       apiKey: deepseekKey,
       model: modelOverride || process.env.DEEPSEEK_MODEL || DEFAULT_MODEL,
       extraHeaders: {},
-      missingKeyMessage:
-        "DEEPSEEK_API_KEY não configurado. Defina a variável no .env do servidor.",
+      missingKeyMessage: "DEEPSEEK_API_KEY não configurado. Defina a variável no .env do servidor.",
     };
   }
 
@@ -193,15 +193,15 @@ function validateAgent(a: AiAgentSuggestion): AiValidationError[] {
 
   // Rule 2 + 3: folga must be one of the 4 valid combos
   // AND sat/sun must not both appear in dias_trabalho.
-  const folga = a.folga.map((d) => d.toLowerCase());
-  const trab = a.dias_trabalho.map((d) => d.toLowerCase());
+  const folga = (a.folga as string[]).map((d) => d.toLowerCase());
+  const trab = (a.dias_trabalho as string[]).map((d) => d.toLowerCase());
 
   const comboOk = VALID_DAY_OFF_COMBOS.some((combo) => {
     const validFolga = combo.folga;
     return (
       validFolga.length === folga.length &&
       validFolga.every((d) => folga.includes(d)) &&
-      folga.every((d) => validFolga.includes(d))
+      folga.every((d) => (validFolga as readonly string[]).includes(d))
     );
   });
   if (!comboOk) {
@@ -425,8 +425,8 @@ function buildSystemPrompt(): string {
     "}",
     "",
     "No campo 'justification' (QUE DEVE SER O PRIMEIRO CAMPO DO JSON), você DEVE " +
-    "fazer uma análise reflexiva passo-a-passo ANTES de definir os agentes. " +
-    "Pense em voz alta da seguinte forma:",
+      "fazer uma análise reflexiva passo-a-passo ANTES de definir os agentes. " +
+      "Pense em voz alta da seguinte forma:",
     "  1. Identifique os maiores picos de defasagem (dias e horários críticos) na tabela.",
     "  2. Pense na alocação do Agente_1 para cobrir o pior gargalo (escolhendo o melhor turno e folga).",
     "  3. Pense no Agente_2, Agente_3 e Agente_4 garantindo escalonamento.",
@@ -647,7 +647,7 @@ function coerceAgents(raw: unknown[]): AiAgentSuggestion[] {
         (c) =>
           c.folga.length === folga.length &&
           c.folga.every((d) => folga.includes(d)) &&
-          folga.every((d) => c.folga.includes(d)),
+          folga.every((d) => (c.folga as readonly string[]).includes(d)),
       );
 
       if (matchedCombo) {
