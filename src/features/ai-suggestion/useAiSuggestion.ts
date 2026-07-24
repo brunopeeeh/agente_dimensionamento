@@ -2,9 +2,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useDimensionamento } from "@/context/DimensionamentoContext";
 import { buildDeficitTable, aiAgentsToNewHires, type AiAgentSuggestion } from "@/lib/ai-suggestion";
+import type { RowCalculation } from "@/context/types";
 
-export function useAiSuggestion() {
+/**
+ * `rowsOverride` permite gerar sugestões sobre um grid simulado (ex.: o
+ * simulador de cenários, que recalcula a escala com ausências e picos de
+ * volume) em vez do grid real do mês. Sem ele, o comportamento é o do painel.
+ */
+export function useAiSuggestion(rowsOverride?: RowCalculation[]) {
   const { currentMonth, rowCalculations, newHires, setNewHires } = useDimensionamento();
+  const rows = rowsOverride ?? rowCalculations;
 
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -25,7 +32,7 @@ export function useAiSuggestion() {
       toast.error("Selecione um mês antes de gerar sugestão.");
       return;
     }
-    const table = buildDeficitTable(rowCalculations);
+    const table = buildDeficitTable(rows);
     if (table.length === 0) {
       toast.info("Sem defasagens detectadas na escala atual — IA não precisa agir.");
       return;
@@ -76,7 +83,7 @@ export function useAiSuggestion() {
       toast.error("Selecione um mês antes de gerar otimização.");
       return;
     }
-    const table = buildDeficitTable(rowCalculations);
+    const table = buildDeficitTable(rows);
     if (table.length === 0) {
       toast.info("Sem defasagens detectadas na escala atual.");
       return;

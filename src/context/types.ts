@@ -91,6 +91,9 @@ export type DimensionamentoState = {
   rowCalculations: RowCalculation[];
   totals: Record<Day, DayTotals>;
   kpis: DimensionamentoKpis;
+  timeBlocks: string[];
+  webchatVolumes: Record<string, Record<Day, number>>;
+  whatsappVolumes: Record<string, Record<Day, number>>;
   tmaFactors: Record<Day, number>;
   simultaneousWC: number;
   simultaneousWA: number;

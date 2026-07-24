@@ -13,10 +13,8 @@ import {
 import { useDimensionamento, DAYS, Day } from "@/context/DimensionamentoContext";
 import { DaySelector } from "@/components/DaySelector";
 import { estimateAgentsNeeded } from "@/lib/optimization/solver";
+import { buildDeficitTable } from "@/lib/ai-suggestion";
 import { AlertTriangle, CheckCircle2, Users, RotateCcw } from "lucide-react";
-
-// Parallel to DAYS (Segunda..Domingo) — short codes expected by the solver's deficit table.
-const DAY_SHORT_CODES = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
 
 export const Route = createLazyFileRoute("/painel")({
   component: Painel,
@@ -42,16 +40,10 @@ function Painel() {
   // Greedy estimate of how many agents are needed to zero out the whole week's
   // WhatsApp deficit — same shift/folga rules as the math solver in Contratações,
   // but cheap enough to recompute on every edit (see estimateAgentsNeeded docs).
-  const agentesRecomendados = useMemo(() => {
-    const deficitTable = rowCalculations.map((r) => {
-      const row: Record<string, number | string> = { start: r.time };
-      DAY_SHORT_CODES.forEach((code, dIdx) => {
-        row[code] = r.waFaltam10[dIdx] ?? 0;
-      });
-      return row;
-    });
-    return estimateAgentsNeeded({ deficitTable });
-  }, [rowCalculations]);
+  const agentesRecomendados = useMemo(
+    () => estimateAgentsNeeded({ deficitTable: buildDeficitTable(rowCalculations) }),
+    [rowCalculations],
+  );
 
   return (
     <div className="space-y-6">

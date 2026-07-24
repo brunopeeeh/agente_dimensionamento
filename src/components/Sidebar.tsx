@@ -8,6 +8,7 @@ import {
   Calendar,
   CalendarCheck,
   CalendarRange,
+  FlaskConical,
   ChevronLeft,
   ChevronRight,
   X,
@@ -21,6 +22,7 @@ export const NAVIGATION_ITEMS = [
   { to: "/webchat", label: "Webchat", icon: MessageSquare },
   { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/contratacoes", label: "Prova Real", icon: ClipboardCheck },
+  { to: "/simulador", label: "Simulador de Cenários", icon: FlaskConical },
   { to: "/calculadora-anual", label: "Calculadora Anual", icon: CalendarRange },
 ] as const;
 

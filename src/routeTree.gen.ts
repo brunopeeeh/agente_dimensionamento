@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as WebchatRouteImport } from './routes/webchat'
+import { Route as SimuladorRouteImport } from './routes/simulador'
 import { Route as PrevisaoEscalaRouteImport } from './routes/previsao-escala'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as EscalaRouteImport } from './routes/escala'
@@ -29,6 +30,11 @@ const WebchatRoute = WebchatRouteImport.update({
   path: '/webchat',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/webchat.lazy').then((d) => d.Route))
+const SimuladorRoute = SimuladorRouteImport.update({
+  id: '/simulador',
+  path: '/simulador',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/simulador.lazy').then((d) => d.Route))
 const PrevisaoEscalaRoute = PrevisaoEscalaRouteImport.update({
   id: '/previsao-escala',
   path: '/previsao-escala',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/escala': typeof EscalaRoute
   '/painel': typeof PainelRoute
   '/previsao-escala': typeof PrevisaoEscalaRoute
+  '/simulador': typeof SimuladorRoute
   '/webchat': typeof WebchatRoute
   '/whatsapp': typeof WhatsappRoute
 }
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/escala': typeof EscalaRoute
   '/painel': typeof PainelRoute
   '/previsao-escala': typeof PrevisaoEscalaRoute
+  '/simulador': typeof SimuladorRoute
   '/webchat': typeof WebchatRoute
   '/whatsapp': typeof WhatsappRoute
 }
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/escala': typeof EscalaRoute
   '/painel': typeof PainelRoute
   '/previsao-escala': typeof PrevisaoEscalaRoute
+  '/simulador': typeof SimuladorRoute
   '/webchat': typeof WebchatRoute
   '/whatsapp': typeof WhatsappRoute
 }
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
     | '/escala'
     | '/painel'
     | '/previsao-escala'
+    | '/simulador'
     | '/webchat'
     | '/whatsapp'
   fileRoutesByTo: FileRoutesByTo
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/escala'
     | '/painel'
     | '/previsao-escala'
+    | '/simulador'
     | '/webchat'
     | '/whatsapp'
   id:
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/escala'
     | '/painel'
     | '/previsao-escala'
+    | '/simulador'
     | '/webchat'
     | '/whatsapp'
   fileRoutesById: FileRoutesById
@@ -147,6 +159,7 @@ export interface RootRouteChildren {
   EscalaRoute: typeof EscalaRoute
   PainelRoute: typeof PainelRoute
   PrevisaoEscalaRoute: typeof PrevisaoEscalaRoute
+  SimuladorRoute: typeof SimuladorRoute
   WebchatRoute: typeof WebchatRoute
   WhatsappRoute: typeof WhatsappRoute
 }
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       path: '/webchat'
       fullPath: '/webchat'
       preLoaderRoute: typeof WebchatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/simulador': {
+      id: '/simulador'
+      path: '/simulador'
+      fullPath: '/simulador'
+      preLoaderRoute: typeof SimuladorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/previsao-escala': {
@@ -227,6 +247,7 @@ const rootRouteChildren: RootRouteChildren = {
   EscalaRoute: EscalaRoute,
   PainelRoute: PainelRoute,
   PrevisaoEscalaRoute: PrevisaoEscalaRoute,
+  SimuladorRoute: SimuladorRoute,
   WebchatRoute: WebchatRoute,
   WhatsappRoute: WhatsappRoute,
 }
