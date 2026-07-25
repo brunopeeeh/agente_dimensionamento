@@ -21,3 +21,22 @@ export const matchAgentName = (capName: string, teamName: string) => {
 
   return teamNorm.includes(capNorm) || capNorm.includes(teamNorm);
 };
+
+export type AgentVolume = { name: string; mediaTri: number; wasRenamed?: boolean };
+
+/**
+ * Soma volumes de duas plataformas (Freshchat + Helpdesk HubSpot) casando os
+ * agentes por nome. Quem existe só em `extra` entra como linha nova, mantendo
+ * o nome vindo de lá.
+ */
+export const mergeAgentVolumes = (base: AgentVolume[], extra: AgentVolume[]): AgentVolume[] => {
+  const merged = base.map((agent) => ({ ...agent }));
+
+  for (const item of extra) {
+    const hit = merged.find((agent) => matchAgentName(agent.name, item.name));
+    if (hit) hit.mediaTri += item.mediaTri;
+    else merged.push({ ...item });
+  }
+
+  return merged;
+};

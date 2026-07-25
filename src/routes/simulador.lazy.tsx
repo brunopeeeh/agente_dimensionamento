@@ -380,7 +380,7 @@ function DeltaCard({
   const diff = sim - base;
   const changed = Math.abs(diff) >= 0.05;
   const isWorse = higherIsWorse ? diff > 0 : diff < 0;
-  const fmt = (n: number) => n.toFixed(decimals);
+  const fmt = (n: number) => n.toFixed(decimals).replace(".", ",");
 
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm backdrop-blur border-border">

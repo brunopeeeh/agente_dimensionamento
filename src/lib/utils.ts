@@ -8,5 +8,5 @@ export function cn(...inputs: ClassValue[]) {
 export function fmtNum(v: unknown, digits = 2) {
   if (typeof v !== "number" || !isFinite(v)) return "";
   if (Number.isInteger(v)) return v.toString();
-  return v.toFixed(digits);
+  return v.toFixed(digits).replace(".", ",");
 }

@@ -1,6 +1,37 @@
 import { createClient } from "@supabase/supabase-js";
 import process from "node:process";
 import { createHash } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+
+/**
+ * Dynamic env helper: reads process.env first, then falls back to reading .env directly
+ * from disk so changes in .env are picked up immediately without restarting dev server.
+ */
+function getEnvVar(key: string): string {
+  if (process.env[key]) return process.env[key]!;
+  try {
+    const envPath = path.resolve(process.cwd(), ".env");
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf-8");
+      const match = content.match(new RegExp(`^${key}=(.*)$`, "m"));
+      if (match) {
+        let val = match[1].trim();
+        if (
+          (val.startsWith('"') && val.endsWith('"')) ||
+          (val.startsWith("'") && val.endsWith("'"))
+        ) {
+          val = val.slice(1, -1);
+        }
+        process.env[key] = val;
+        return val;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return "";
+}
 
 /**
  * Server-only module: calls OpenRouter to suggest shift+hiring schedule for
@@ -16,11 +47,13 @@ import { createHash } from "node:crypto";
  * Supabase table expected: `ai_sugestoes` (see supabase/migrations/001_ai_sugestoes.sql).
  */
 
+const NVIDIA_URL_DEFAULT = "https://integrate.api.nvidia.com/v1/chat/completions";
+const NVIDIA_DEFAULT_MODEL = "z-ai/glm-5.2";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
 const DASHSCOPE_URL_DEFAULT =
   "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions";
-const DEFAULT_MODEL = "deepseek-chat";
+const DEFAULT_MODEL = "z-ai/glm-5.2";
 const DASHSCOPE_DEFAULT_MODEL = "qwen3-max";
 const CACHE_TTL_HOURS = 24;
 const MAX_RETRIES = 3;
@@ -107,16 +140,16 @@ export type AiSuggestionRequest = {
 };
 
 function getSupabase() {
-  const url = process.env.VITE_SUPABASE_URL || "";
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+  const url = getEnvVar("VITE_SUPABASE_URL");
+  const serviceKey = getEnvVar("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = getEnvVar("VITE_SUPABASE_ANON_KEY");
   const key = serviceKey || anonKey;
   if (!url || !key) return null;
   return createClient(url, key);
 }
 
 type ChatProvider = {
-  name: "deepseek" | "dashscope" | "openrouter";
+  name: "nvidia" | "deepseek" | "dashscope" | "openrouter";
   url: string;
   apiKey: string;
   model: string;
@@ -126,47 +159,36 @@ type ChatProvider = {
 
 /**
  * Resolves which OpenAI-compatible chat provider to use.
- * Priority: DeepSeek (native) → Alibaba DashScope → OpenRouter.
+ * Primary: NVIDIA API (z-ai/glm-5.2) → OpenRouter (z-ai/glm-5.2).
  */
 function getProvider(modelOverride?: string): ChatProvider {
-  // 1. DeepSeek native
-  const deepseekKey = process.env.DEEPSEEK_API_KEY || "";
-  if (deepseekKey) {
-    return {
-      name: "deepseek",
-      url: DEEPSEEK_URL,
-      apiKey: deepseekKey,
-      model: modelOverride || process.env.DEEPSEEK_MODEL || DEFAULT_MODEL,
-      extraHeaders: {},
-      missingKeyMessage: "DEEPSEEK_API_KEY não configurado. Defina a variável no .env do servidor.",
-    };
-  }
+  const nvidiaKey = getEnvVar("NVIDIA_API_KEY");
+  const openrouterKey = getEnvVar("OPENROUTER_API_KEY");
 
-  // 2. DashScope
-  const dashKey = process.env.DASHSCOPE_API_KEY || "";
-  if (dashKey) {
+  // 1. NVIDIA API (GLM 5.2) - Primary Provider
+  if (nvidiaKey || !openrouterKey) {
     return {
-      name: "dashscope",
-      url: process.env.DASHSCOPE_BASE_URL || DASHSCOPE_URL_DEFAULT,
-      apiKey: dashKey,
-      model: modelOverride || process.env.DASHSCOPE_MODEL || DASHSCOPE_DEFAULT_MODEL,
+      name: "nvidia",
+      url: getEnvVar("NVIDIA_BASE_URL") || NVIDIA_URL_DEFAULT,
+      apiKey: nvidiaKey,
+      model: modelOverride || getEnvVar("NVIDIA_MODEL") || NVIDIA_DEFAULT_MODEL,
       extraHeaders: {},
       missingKeyMessage:
-        "DASHSCOPE_API_KEY não configurado. Defina a variável no .env do servidor.",
+        "NVIDIA_API_KEY não está preenchida no arquivo .env. Adicione 'NVIDIA_API_KEY=nvapi-...' no seu arquivo .env para usar o GLM-5.2.",
     };
   }
 
-  // 3. OpenRouter fallback
+  // 2. OpenRouter fallback (preserves GLM-5.2 model target)
   return {
     name: "openrouter",
     url: OPENROUTER_URL,
-    apiKey: process.env.OPENROUTER_API_KEY || "",
-    model: modelOverride || process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
+    apiKey: openrouterKey,
+    model: modelOverride || getEnvVar("OPENROUTER_MODEL") || NVIDIA_DEFAULT_MODEL,
     extraHeaders: {
       "HTTP-Referer": "https://dimensionamento.yooga.local",
       "X-Title": "Yooga Dimensionamento AI",
     },
-    missingKeyMessage: "OPENROUTER_API_KEY não configurado. Defina a variável no .env do servidor.",
+    missingKeyMessage: "OPENROUTER_API_KEY não configurado no .env.",
   };
 }
 
@@ -474,6 +496,17 @@ async function callChatCompletion(
     throw new Error(provider.missingKeyMessage);
   }
 
+  const requestBody: Record<string, unknown> = {
+    model: provider.model,
+    messages,
+    temperature: 0.2,
+    max_tokens: 4000,
+  };
+
+  if (provider.name !== "nvidia") {
+    requestBody.response_format = { type: "json_object" };
+  }
+
   const res = await fetch(provider.url, {
     method: "POST",
     headers: {
@@ -481,13 +514,7 @@ async function callChatCompletion(
       "content-type": "application/json",
       ...provider.extraHeaders,
     },
-    body: JSON.stringify({
-      model: provider.model,
-      messages,
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 4000,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) {

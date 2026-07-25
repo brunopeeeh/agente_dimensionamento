@@ -413,11 +413,10 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
               <span key={v.id} className="inline-flex items-center gap-0.5 select-none">
                 <button
                   onClick={() => setView(v.id)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                    view === v.id
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${view === v.id
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  }`}
+                    }`}
                 >
                   {v.label}
                 </button>
@@ -496,13 +495,13 @@ export function TimeGridSheet({ mode, title, subtitle }: Props) {
                   const t = totals[d];
                   const label =
                     view === "volume"
-                      ? t.volume.toFixed(1)
+                      ? t.volume.toFixed(1).replace(".", ",")
                       : view === "capacity"
-                        ? t.capacity.toFixed(1)
+                        ? t.capacity.toFixed(2).replace(".", ",")
                         : view === "capacityR"
                           ? t.capacityR.toFixed(0)
                           : view === "resultado"
-                            ? t.resultado.toFixed(1)
+                            ? t.resultado.toFixed(2).replace(".", ",")
                             : view === "faltam10"
                               ? t.faltam10.toFixed(0)
                               : t.faltam20.toFixed(0);
@@ -598,12 +597,13 @@ const ValueCell = React.memo(
     if (view === "capacity") {
       return (
         <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">
-          {cap.toFixed(2)}
+          {cap.toFixed(2).replace(".", ",")}
         </td>
       );
     }
     if (view === "resultado") {
       const val = res;
+      const formattedVal = val.toFixed(2).replace(".", ",");
       if (val > 0) {
         // Positive surplus -> dynamic green gradient background
         const intensity = Math.min(val / 10, 1.0);
@@ -613,7 +613,7 @@ const ValueCell = React.memo(
             style={{ backgroundColor: `rgba(16, 185, 129, ${alpha})` }}
             className="px-3 py-1.5 text-right text-xs font-semibold tabular-nums text-emerald-800 dark:text-emerald-300 transition-colors duration-150"
           >
-            {val.toFixed(2)}
+            {formattedVal}
           </td>
         );
       }
@@ -626,13 +626,13 @@ const ValueCell = React.memo(
             style={{ backgroundColor: `rgba(239, 68, 68, ${alpha})` }}
             className="px-3 py-1.5 text-right text-xs font-semibold tabular-nums text-rose-800 dark:text-rose-300 transition-colors duration-150"
           >
-            {val.toFixed(2)}
+            {formattedVal}
           </td>
         );
       }
       return (
         <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground/50">
-          0.00
+          0,00
         </td>
       );
     }

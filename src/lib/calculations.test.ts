@@ -62,9 +62,9 @@ describe("computeGridCalculations", () => {
     expect(row.capacityR[0]).toBe(9);
     expect(row.resultado[0]).toBe(7);
     expect(row.agentsWhats[0]).toBe(2);
-    // whatsapp capacity = 2 freed agents * factorWA(3 * 4/3 = 4) = 8, volume 2 -> fully covered
+    // whatsapp capacity = 2 freed agents * factorWA(3 * 4/3 = 4) = 8, volume 2 -> surplus 6 (waFaltam10 = -2)
     expect(row.waCapacityR[0]).toBe(8);
-    expect(row.waFaltam10[0]).toBe(0);
+    expect(row.waFaltam10[0]).toBe(-2);
     expect(result.kpis.coberturaProjetada).toBe(100);
   });
 
@@ -100,8 +100,8 @@ describe("computeGridCalculations", () => {
       ],
     });
 
-    // The simulated hire covers the 10:00 block -> prova real deficit drops to 0.
-    expect(withHire.rowCalculations[0].prFaltam10[0]).toBe(0);
+    // The simulated hire covers the 10:00 block -> prova real deficit drops to -1 surplus.
+    expect(withHire.rowCalculations[0].prFaltam10[0]).toBe(-1);
     expect(withHire.kpis.provaRealDeficit10).toBe(0);
     // The raw (non-simulated) deficit is unaffected by the hire.
     expect(withHire.rowCalculations[0].waFaltam10[0]).toBe(1);

@@ -97,7 +97,7 @@ function Painel() {
           <KpiCard
             icon={CheckCircle2}
             label="Cobertura Semanal (SLA)"
-            value={`${kpis.coberturaProjetada.toFixed(1)}%`}
+            value={`${kpis.coberturaProjetada.toFixed(1).replace(".", ",")}%`}
             hint="Fluxo total coberto pela equipe"
             color="text-success bg-success/10"
             tone={

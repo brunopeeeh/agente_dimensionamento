@@ -1,12 +1,15 @@
 import process from "node:process";
-import { matchAgentName } from "@/lib/agents";
+import { matchAgentName, mergeAgentVolumes, type AgentVolume } from "@/lib/agents";
 import { handleSyncCapacity } from "./sync-capacity.server";
+import { getHubspotVolumes90Days } from "./hubspot.server";
 
 /**
  * Server-only module: imports Care support agents from Freshchat and pushes
- * their 90-day resolved-interaction volume into Supabase.
+ * their 90-day resolved-interaction volume into Supabase. O volume do Helpdesk
+ * HubSpot (mesma janela de 90 dias) é somado ao do Freshchat por agente.
  *
- * Required env: FRESHCHAT_BEARER_TOKEN (no VITE_ prefix — server-only secret).
+ * Required env: FRESHCHAT_BEARER_TOKEN, HUBSPOT_ACCESS_TOKEN
+ * (no VITE_ prefix — server-only secrets).
  */
 
 const FRESHCHAT_API = "https://api.freshchat.com/v2";
@@ -37,9 +40,19 @@ const STATIC_CAPACITY_AGENTS = [
 //     vence, real é descartado.
 //   - Real que foi RENOMEADO para um nome estático → real vence e SUBSTITUI
 //     o estático (a renomeação indica intenção explícita de usar o real).
-const EXCLUDE_NAMES = ["Maya Santos"];
+// "Maya da Yooga" é a mesma IA do Freshchat ("Maya Santos"), cadastrada com
+// outro nome no HubSpot (yara.ai@) — sem isso o volume do bot entraria como
+// agente humano.
+const EXCLUDE_NAMES = ["Maya Santos", "Maya da Yooga"];
+
+// Também normaliza nomes do HubSpot para o cadastro do Freshchat, quando a
+// mesma pessoa está registrada de forma diferente nas duas plataformas —
+// senão o agente vira duas linhas em vez de somar.
 const RENAME_MAP: Record<string, string> = {
   "Yooga Tecnologia": "Care IA",
+  "Brenda Patricio": "Brenda de Souza Patricio",
+  "Julio Oliveira Monteiro": "Julio Cesar Oliveira Monteiro",
+  "Bryan Ladislau": "Bryan Américo",
 };
 
 // Concurrency cap for the volume fetch (per-agent metric requests). Keeps us
@@ -120,6 +133,25 @@ export async function getSupportAgents(): Promise<FreshchatAgent[]> {
 }
 
 /**
+ * Janela de 90 dias usada pelas duas plataformas (Freshchat e HubSpot).
+ *
+ * Ajuste para pegar a data atual no fuso horário do Brasil (UTC-3) e definir o
+ * fim como 00:00:00 do dia atual, ignorando as horas de hoje.
+ */
+export function getWindow90Days(): { start: Date; end: Date } {
+  const now = new Date();
+  const localTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+
+  const end = new Date(
+    Date.UTC(localTime.getUTCFullYear(), localTime.getUTCMonth(), localTime.getUTCDate()),
+  );
+  const start = new Date(end);
+  start.setUTCDate(end.getUTCDate() - 90);
+
+  return { start, end };
+}
+
+/**
  * Fetches the 90-day resolved-interaction count for each agent, in parallel.
  * Returns a map of `agentId → totalVolume` (sum of all daily values).
  */
@@ -130,16 +162,7 @@ export async function getAgentVolumes90Days(agentIds: string[]): Promise<Record<
   }
   if (agentIds.length === 0) return {};
 
-  // Ajuste para pegar a data atual no fuso horário do Brasil (UTC-3)
-  // e definir o fim como 00:00:00 do dia atual, ignorando as horas de hoje.
-  const now = new Date();
-  const localTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-
-  const end = new Date(
-    Date.UTC(localTime.getUTCFullYear(), localTime.getUTCMonth(), localTime.getUTCDate()),
-  );
-  const start = new Date(end);
-  start.setUTCDate(end.getUTCDate() - 90);
+  const { start, end } = getWindow90Days();
 
   const startStr = start.toISOString(); // ex: 2026-03-31T00:00:00.000Z
   const endStr = end.toISOString(); // ex: 2026-06-29T00:00:00.000Z
@@ -231,6 +254,7 @@ export async function getAgentVolumes90Days(agentIds: string[]): Promise<Record<
  *
  *  1. Fetch filtered support agents from Freshchat
  *  2. Fetch their 90-day resolved-interaction totals
+ *  2b. Fetch the 90-day HubSpot Helpdesk ticket totals and sum them per agent
  *  3. Filter: drop EXCLUDE_NAMES, drop agents not on the schedule
  *  4. Apply RENAME_MAP (Care IA substitution from Yooga Tecnologia)
  *  5. Dedupe against STATIC_CAPACITY_AGENTS (per-name precedence rule)
@@ -261,20 +285,57 @@ export async function runFreshchatSync(req: FreshchatSyncRequest): Promise<Fresh
     };
   }
 
-  const supportAgents = await getSupportAgents();
+  const applyRename = (fullName: string) => {
+    const renamed = RENAME_MAP[fullName] ?? RENAME_MAP[lc(fullName)];
+    return { name: renamed ?? fullName, wasRenamed: !!renamed };
+  };
 
-  const volumes = await getAgentVolumes90Days(supportAgents.map((a) => a.id));
-
-  const realAgentsProcessed = supportAgents
-    .map((a) => {
+  // As duas plataformas são independentes: durante a migração Freshchat →
+  // HubSpot, a queda de uma não pode zerar o volume da outra. Cada falha vira
+  // aviso na mensagem — número parcial nunca passa como completo. Se as duas
+  // falharem, o sync aborta em vez de gravar zeros.
+  let freshchatWarning = "";
+  let freshchatAgents: AgentVolume[] = [];
+  try {
+    const supportAgents = await getSupportAgents();
+    const volumes = await getAgentVolumes90Days(supportAgents.map((a) => a.id));
+    freshchatAgents = supportAgents.map((a) => {
       const fullName = `${a.first_name || ""} ${a.last_name || ""}`.trim() || a.id;
-      const renamed = RENAME_MAP[fullName] ?? RENAME_MAP[lc(fullName)];
-      return {
-        name: renamed ?? fullName,
-        mediaTri: Math.round(volumes[a.id] || 0),
-        wasRenamed: !!renamed,
-      };
-    })
+      const { name, wasRenamed } = applyRename(fullName);
+      return { name, mediaTri: Math.round(volumes[a.id] || 0), wasRenamed };
+    });
+  } catch (err) {
+    freshchatWarning = err instanceof Error ? err.message : String(err);
+    console.warn("[freshchat] volume ignorado neste sync:", freshchatWarning);
+  }
+
+  // Helpdesk HubSpot: mesma janela de 90 dias, somado por nome de agente.
+  let hubspotWarning = "";
+  let hubspotAgents: AgentVolume[] = [];
+  try {
+    hubspotAgents = (await getHubspotVolumes90Days(getWindow90Days())).map((h) => {
+      const { name, wasRenamed } = applyRename(h.name);
+      return { name, mediaTri: h.total, wasRenamed };
+    });
+  } catch (err) {
+    hubspotWarning = err instanceof Error ? err.message : String(err);
+    console.warn("[hubspot] volume ignorado neste sync:", hubspotWarning);
+  }
+
+  if (freshchatWarning && hubspotWarning) {
+    return {
+      success: false,
+      message: `Nenhuma plataforma respondeu — nada foi gravado. Freshchat: ${freshchatWarning} | HubSpot: ${hubspotWarning}`,
+      month: monthName,
+      agents_synced: 0,
+      agents_added_to_team: [],
+      agents_removed_from_team: [],
+      total_team_agents: 0,
+      error: "NO_SOURCE_AVAILABLE",
+    };
+  }
+
+  const realAgentsProcessed = mergeAgentVolumes(freshchatAgents, hubspotAgents)
     .filter((a) => !EXCLUDE_NAMES.includes(a.name) && !EXCLUDE_NAMES.includes(lc(a.name)))
     // Regra estrita: se nenhum nome da escala foi enviado, TODOS os reais
     // são descartados — apenas as estáticas (Yooga Suporte + Care IA) sobrevivem.
@@ -316,7 +377,12 @@ export async function runFreshchatSync(req: FreshchatSyncRequest): Promise<Fresh
 
   return {
     success: true,
-    message: `Sincronização concluída: ${capacity_agents.length} agentes atualizados em "${monthName}".`,
+    message:
+      `Sincronização concluída: ${capacity_agents.length} agentes atualizados em "${monthName}".` +
+      (freshchatWarning ? ` ATENÇÃO: volume do Freshchat NÃO entrou (${freshchatWarning}).` : "") +
+      (hubspotWarning
+        ? ` ATENÇÃO: volume do Helpdesk HubSpot NÃO foi somado (${hubspotWarning}).`
+        : ""),
     month: monthName,
     agents_synced: capacity_agents.length,
     agents_added_to_team: result.data.agents_added_to_team,

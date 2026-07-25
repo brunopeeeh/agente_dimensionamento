@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeName, matchAgentName } from "./agents";
+import { normalizeName, matchAgentName, mergeAgentVolumes } from "./agents";
 
 describe("normalizeName", () => {
   it("lowercases, strips accents, and removes non-letters", () => {
@@ -25,5 +25,35 @@ describe("matchAgentName", () => {
 
   it("is accent- and case-insensitive", () => {
     expect(matchAgentName("JÚLIO", "julio cesar")).toBe(true);
+  });
+});
+
+describe("mergeAgentVolumes", () => {
+  it("sums Freshchat + HubSpot volumes for the same agent", () => {
+    const merged = mergeAgentVolumes(
+      [{ name: "Bruno Oliveira", mediaTri: 100 }],
+      [{ name: "Bruno", mediaTri: 40 }],
+    );
+
+    expect(merged).toEqual([{ name: "Bruno Oliveira", mediaTri: 140 }]);
+  });
+
+  it("keeps agents that only exist on one platform", () => {
+    const merged = mergeAgentVolumes(
+      [{ name: "Bruno Oliveira", mediaTri: 100 }],
+      [{ name: "Wagner Lima", mediaTri: 30 }],
+    );
+
+    expect(merged).toEqual([
+      { name: "Bruno Oliveira", mediaTri: 100 },
+      { name: "Wagner Lima", mediaTri: 30 },
+    ]);
+  });
+
+  it("does not mutate the base array", () => {
+    const base = [{ name: "Bruno Oliveira", mediaTri: 100 }];
+    mergeAgentVolumes(base, [{ name: "Bruno", mediaTri: 40 }]);
+
+    expect(base[0].mediaTri).toBe(100);
   });
 });

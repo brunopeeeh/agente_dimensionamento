@@ -137,6 +137,11 @@ export function computeDynamicTmaFactors(
   return factors;
 }
 
+function excelRoundUp(val: number): number {
+  if (val === 0) return 0;
+  return val > 0 ? Math.ceil(val) : Math.floor(val);
+}
+
 export function computeGridCalculations(params: {
   days: readonly Day[];
   timeBlocks: string[];
@@ -218,8 +223,8 @@ export function computeGridCalculations(params: {
       const waSurplus = capWaRounded - volWA;
 
       const waDeficitChats = Math.max(0, volWA - capWaRounded);
-      const waFaltam10 = Math.ceil(waDeficitChats / simultaneousWA);
-      const waFaltam20 = Math.ceil(waDeficitChats / (simultaneousWA * 2));
+      const waFaltam10 = excelRoundUp(waSurplus / -simultaneousWA);
+      const waFaltam20 = excelRoundUp(waSurplus / -(simultaneousWA * 2));
 
       const activeNewHires = newHires.reduce((count, hire) => {
         if (hire.active) {
@@ -247,25 +252,26 @@ export function computeGridCalculations(params: {
       const prWcAgentsForWhats = wcAgentsForWhats + activeNewHires;
       const prCapWaRaw = prWcAgentsForWhats * factorWA;
       const prCapWaRounded = Math.ceil(prCapWaRaw);
+      const prWaSurplus = prCapWaRounded - volWA;
       const prWaDeficitChats = Math.max(0, volWA - prCapWaRounded);
-      const prFaltam10 = Math.ceil(prWaDeficitChats / simultaneousWA);
-      const prFaltam20 = Math.ceil(prWaDeficitChats / (simultaneousWA * 2));
+      const prFaltam10 = excelRoundUp(prWaSurplus / -simultaneousWA);
+      const prFaltam20 = excelRoundUp(prWaSurplus / -(simultaneousWA * 2));
 
       computedTotals[day].wcVolume += volWC;
       computedTotals[day].wcCapacity += capWcRounded;
       computedTotals[day].waVolume += volWA;
       computedTotals[day].waCapacity += capWaRounded;
-      computedTotals[day].waDeficit10 += waFaltam10;
+      computedTotals[day].waDeficit10 += Math.max(0, waFaltam10);
       computedTotals[day].prCapacity += prCapWaRounded;
-      computedTotals[day].prDeficit10 += prFaltam10;
+      computedTotals[day].prDeficit10 += Math.max(0, prFaltam10);
 
       totalWcVolume += volWC;
       totalWcCapacity += capWcRounded;
       totalWaVolume += volWA;
       totalWaCapacity += capWaRounded;
-      totalDeficit10 += waFaltam10;
-      totalDeficit20 += waFaltam20;
-      totalPrDeficit10 += prFaltam10;
+      totalDeficit10 += Math.max(0, waFaltam10);
+      totalDeficit20 += Math.max(0, waFaltam20);
+      totalPrDeficit10 += Math.max(0, prFaltam10);
       totalSurplus += Math.max(0, wcSurplus) + Math.max(0, waSurplus);
       totalWaDeficitChats += waDeficitChats;
 

@@ -9,6 +9,7 @@ import type { FreshchatSyncResult } from "./lib/api/freshchat.server";
 import { runAiSuggestion } from "./lib/api/ai-agent.server";
 import type { AiSuggestionRequest, AiSuggestionResponse } from "./lib/api/ai-agent.server";
 import { runMathSuggestion } from "./lib/optimization/solver";
+import { hasValidApiKey, isCrossSite } from "./lib/api-guards";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -44,16 +45,39 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+// Sem cabeçalhos CORS: a UI chama estes endpoints por URL relativa (mesma
+// origem) e o n8n chama server-to-server, onde CORS não se aplica. O `*`
+// anterior liberava qualquer site do browser a queimar as chaves de IA e a
+// escrever no Supabase via SERVICE_ROLE_KEY.
 const API_HEADERS = {
   "content-type": "application/json",
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "POST, OPTIONS",
-  "access-control-allow-headers": "content-type",
 };
 
 // Handle custom API routes before delegating to TanStack Start SSR
 async function handleApiRoutes(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
+
+  if (url.pathname.startsWith("/api/")) {
+    if (isCrossSite(request, url)) {
+      return new Response(JSON.stringify({ success: false, error: "Origem não permitida." }), {
+        status: 403,
+        headers: API_HEADERS,
+      });
+    }
+
+    // /api/sync-capacity só é chamada pelo n8n (a UI usa /api/sync-from-freshchat,
+    // que invoca handleSyncCapacity internamente). Escreve com service role.
+    if (
+      url.pathname === "/api/sync-capacity" &&
+      request.method !== "OPTIONS" &&
+      !hasValidApiKey(request)
+    ) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Não autorizado: x-api-key ausente ou inválida." }),
+        { status: 401, headers: API_HEADERS },
+      );
+    }
+  }
 
   // POST /api/sync-capacity — manually invoked or proxied from /api/sync-from-freshchat
   if (url.pathname === "/api/sync-capacity") {
