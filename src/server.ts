@@ -9,6 +9,7 @@ import type { FreshchatSyncResult } from "./lib/api/freshchat.server";
 import { runAiSuggestion } from "./lib/api/ai-agent.server";
 import type { AiSuggestionRequest, AiSuggestionResponse } from "./lib/api/ai-agent.server";
 import { runMathSuggestion } from "./lib/optimization/solver";
+import { chatOraculo, type OraculoChatInput } from "./lib/api/oraculo-agent.server";
 import { hasValidApiKey, isCrossSite } from "./lib/api-guards";
 
 type ServerEntry = {
@@ -254,6 +255,64 @@ async function handleApiRoutes(request: Request): Promise<Response | null> {
         headers: API_HEADERS,
       });
     }
+  }
+
+  // POST /api/oraculo/chat — Oráculo de Dimensionamento (tool calling + dados
+  // reais do Supabase). Responde em SSE: eventos {type:content|tool_call}.
+  if (url.pathname === "/api/oraculo/chat") {
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: API_HEADERS });
+    }
+    if (request.method !== "POST") {
+      return new Response(JSON.stringify({ success: false, error: "Method not allowed. Use POST." }), {
+        status: 405,
+        headers: API_HEADERS,
+      });
+    }
+
+    let body: OraculoChatInput;
+    try {
+      body = (await request.json()) as OraculoChatInput;
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: "JSON inválido." }), {
+        status: 400,
+        headers: API_HEADERS,
+      });
+    }
+    if (!body || typeof body.message !== "string" || !body.message.trim()) {
+      return new Response(JSON.stringify({ success: false, error: "Campo 'message' é obrigatório." }), {
+        status: 400,
+        headers: API_HEADERS,
+      });
+    }
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of chatOraculo(body)) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Erro no Oráculo.";
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "content", data: `⚠️ ${message}` })}\n\n`),
+          );
+        } finally {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+      },
+    });
   }
 
   return null; // Not an API route — delegate to TanStack Start
