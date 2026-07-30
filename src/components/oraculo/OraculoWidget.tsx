@@ -2,7 +2,16 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { Sparkles, X, Send, RefreshCw, Bot, Calculator, TrendingUp, AlertTriangle, Activity } from "lucide-react";
 import { useDimensionamento } from "@/context/DimensionamentoContext";
-import { processOraculoChat, type PageContext } from "@/lib/api/oraculo-service";
+import { streamOraculo } from "@/lib/api/oraculo-client";
+
+type PageContext = {
+  currentPath: string;
+  activeAgentsCount: number;
+  totalDeficit10: number;
+  webchatVolume: number;
+  whatsappVolume: number;
+  coberturaProjetada: number;
+};
 
 export function OraculoWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -55,7 +64,17 @@ export function OraculoWidget() {
 
     try {
       const pageContext = getPageContext();
-      const responseText = await processOraculoChat(textToSend, [], pageContext);
+      const history = messages
+        .filter((m) => m.id !== "welcome" && m.text.trim())
+        .map((m) => ({
+          role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+          content: m.text,
+        }));
+      const { text: responseText } = await streamOraculo({
+        message: textToSend,
+        history,
+        pageContext: pageContext as unknown as Record<string, unknown>,
+      });
 
       setMessages((prev) => [
         ...prev,

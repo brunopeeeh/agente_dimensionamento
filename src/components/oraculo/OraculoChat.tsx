@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, Send, RefreshCw, Cpu, Calculator, TrendingUp, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { streamOraculo } from "@/lib/api/oraculo-client";
 
 type Message = {
   id: string;
   sender: "user" | "oraculo";
   text: string;
-  toolCalls?: Array<{ name: string; args: any; result: any }>;
+  toolCalls?: Array<{ name: string; result: unknown }>;
   isStreaming?: boolean;
 };
 
@@ -31,108 +32,48 @@ export function OraculoChat() {
 
     const userMsgId = Date.now().toString();
     const userMsg: Message = { id: userMsgId, sender: "user", text: messageText };
-    
+
     const botMsgId = (Date.now() + 1).toString();
     const initialBotMsg: Message = { id: botMsgId, sender: "oraculo", text: "", isStreaming: true, toolCalls: [] };
+
+    // Histórico da conversa (o endpoint é stateless — o cliente envia o contexto).
+    const history = messages
+      .filter((m) => m.id !== "welcome" && m.text.trim())
+      .map((m) => ({ role: m.sender === "user" ? ("user" as const) : ("assistant" as const), content: m.text }));
 
     setMessages((prev) => [...prev, userMsg, initialBotMsg]);
     if (!textToSend) setInput("");
     setLoading(true);
 
     try {
-      // Tentar streaming via API FastAPI local (http://localhost:8000/api/oraculo/chat)
-      const response = await fetch("http://localhost:8000/api/oraculo/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText }),
-      });
-
-      if (response.ok && response.body) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulatedText = "";
-        let toolCallsList: any[] = [];
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const chunkStr = decoder.decode(value);
-          const lines = chunkStr.split("\n\n");
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const dataContent = line.slice(6).trim();
-              if (dataContent === "[DONE]") break;
-              try {
-                const parsed = JSON.parse(dataContent);
-                if (parsed.type === "content") {
-                  accumulatedText += parsed.data;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === botMsgId
-                        ? { ...msg, text: accumulatedText }
-                        : msg
-                    )
-                  );
-                } else if (parsed.type === "tool_call" && parsed.data.status === "completed") {
-                  toolCallsList.push(parsed.data);
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === botMsgId
-                        ? { ...msg, toolCalls: [...toolCallsList] }
-                        : msg
-                    )
-                  );
-                }
-              } catch (e) {
-                // Ignore parse errors for incomplete chunks
-              }
-            }
-          }
-        }
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === botMsgId ? { ...msg, isStreaming: false } : msg
-          )
-        );
-      } else {
-        throw new Error("Servidor API offline");
-      }
+      await streamOraculo(
+        { message: messageText, history },
+        {
+          onContent: (fullText) => {
+            setMessages((prev) =>
+              prev.map((msg) => (msg.id === botMsgId ? { ...msg, text: fullText } : msg)),
+            );
+          },
+          onToolCall: (toolCalls) => {
+            setMessages((prev) =>
+              prev.map((msg) => (msg.id === botMsgId ? { ...msg, toolCalls: [...toolCalls] } : msg)),
+            );
+          },
+        },
+      );
     } catch (err) {
-      // Fallback local simulado com motor direto de cálculo se o servidor API não estiver rodando
-      let fallbackText = "⚠️ *[Nota: API FastAPI offline em localhost:8000. Executando resposta com cálculo direto no frontend]*\n\n";
-      
-      if (messageText.toLowerCase().includes("mês atual") || messageText.toLowerCase().includes("mes atual")) {
-        fallbackText += "### 📊 Dimensionamento do Mês Atual (Care Yooga)\n\n" +
-          "- **Volume Diário Projetado:** 1.200 chamados/dia (36.000 mensais)\n" +
-          "- **TMA Médio Webchat:** 16,5 min (3 chats/agente simultâneos)\n" +
-          "- **TMA Médio WhatsApp:** 13,0 min (4 chats/agente simultâneos)\n" +
-          "- **Headcount FTE Recomendado:** **27 Agentes** (incluindo 20% de shrinkage/absenteísmo)\n\n" +
-          "**Distribuição por Turnos (Escala 20h):**\n" +
-          "1. **Manhã (07:00 - 15:20):** 10 Atendentes\n" +
-          "2. **Tarde/Pico (13:00 - 21:20):** 13 Atendentes (Reforço no horário do jantar)\n" +
-          "3. **Coruja (18:40 - 03:00):** 6 Atendentes";
-      } else if (messageText.toLowerCase().includes("futuro") || messageText.toLowerCase().includes("próximo mês")) {
-        fallbackText += "### 📈 Projeção do Próximo Mês (+15% Crescimento)\n\n" +
-          "- **Volume Projetado:** 1.380 chamados/dia (41.400 mensais)\n" +
-          "- **Headcount Necessário:** **31 FTEs**\n" +
-          "- **Novas Contratações:** **+4 Agentes** (Custo estimado: R$ 14.000,00/mês)\n\n" +
-          "**Recomendação do Oráculo:** Iniciar processo seletivo até o dia 10 para garantir treinamento antes do pico de demanda.";
-      } else {
-        fallbackText += "Com base nas regras do modelo de negócio do Care Yooga:\n\n" +
-          "- **Operação 20h (07:00 às 03:00)**\n" +
-          "- **Webchat Prioritário:** Capacidade de 3 chats simultâneos por agente. SLA alvo 60s.\n" +
-          "- **Transbordamento WhatsApp:** O excedente não utilizado no Webchat é convertido na razão de 1 agente liberado a cada 3 chats de sobra.\n\n" +
-          "Deseja que eu execute o dimensionamento detalhado do mês atual ou simule o próximo mês com percentual de crescimento?";
-      }
-
+      const detail = err instanceof Error ? err.message : "erro desconhecido";
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === botMsgId ? { ...msg, text: fallbackText, isStreaming: false } : msg
-        )
+          msg.id === botMsgId
+            ? { ...msg, text: `⚠️ Não consegui falar com o Oráculo (${detail}).` }
+            : msg,
+        ),
       );
     } finally {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === botMsgId ? { ...msg, isStreaming: false } : msg)),
+      );
       setLoading(false);
     }
   };
@@ -145,13 +86,6 @@ export function OraculoChat() {
         text: "Memória da sessão reiniciada. Como posso ajudar com os cálculos e projeções de dimensionamento?",
       },
     ]);
-    try {
-      await fetch("http://localhost:8000/api/oraculo/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "", reset_history: true }),
-      });
-    } catch (e) {}
   };
 
   return (
