@@ -9,23 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as OraculoRouteImport } from './routes/oraculo'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as WebchatRouteImport } from './routes/webchat'
 import { Route as SimuladorRouteImport } from './routes/simulador'
 import { Route as PrevisaoEscalaRouteImport } from './routes/previsao-escala'
 import { Route as PainelRouteImport } from './routes/painel'
+import { Route as OraculoRouteImport } from './routes/oraculo'
 import { Route as EscalaRouteImport } from './routes/escala'
 import { Route as ContratacoesRouteImport } from './routes/contratacoes'
 import { Route as CapacidadeRouteImport } from './routes/capacidade'
 import { Route as CalculadoraAnualRouteImport } from './routes/calculadora-anual'
 import { Route as IndexRouteImport } from './routes/index'
-
-const OraculoRoute = OraculoRouteImport.update({
-  id: '/oraculo',
-  path: '/oraculo',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() => import('./routes/oraculo.lazy').then((d) => d.Route))
 
 const WhatsappRoute = WhatsappRouteImport.update({
   id: '/whatsapp',
@@ -54,6 +48,11 @@ const PainelRoute = PainelRouteImport.update({
   path: '/painel',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/painel.lazy').then((d) => d.Route))
+const OraculoRoute = OraculoRouteImport.update({
+  id: '/oraculo',
+  path: '/oraculo',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/oraculo.lazy').then((d) => d.Route))
 const EscalaRoute = EscalaRouteImport.update({
   id: '/escala',
   path: '/escala',
@@ -88,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/capacidade': typeof CapacidadeRoute
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
+  '/oraculo': typeof OraculoRoute
   '/painel': typeof PainelRoute
   '/previsao-escala': typeof PrevisaoEscalaRoute
   '/simulador': typeof SimuladorRoute
@@ -100,6 +100,7 @@ export interface FileRoutesByTo {
   '/capacidade': typeof CapacidadeRoute
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
+  '/oraculo': typeof OraculoRoute
   '/painel': typeof PainelRoute
   '/previsao-escala': typeof PrevisaoEscalaRoute
   '/simulador': typeof SimuladorRoute
@@ -113,6 +114,7 @@ export interface FileRoutesById {
   '/capacidade': typeof CapacidadeRoute
   '/contratacoes': typeof ContratacoesRoute
   '/escala': typeof EscalaRoute
+  '/oraculo': typeof OraculoRoute
   '/painel': typeof PainelRoute
   '/previsao-escala': typeof PrevisaoEscalaRoute
   '/simulador': typeof SimuladorRoute
@@ -127,6 +129,7 @@ export interface FileRouteTypes {
     | '/capacidade'
     | '/contratacoes'
     | '/escala'
+    | '/oraculo'
     | '/painel'
     | '/previsao-escala'
     | '/simulador'
@@ -139,6 +142,7 @@ export interface FileRouteTypes {
     | '/capacidade'
     | '/contratacoes'
     | '/escala'
+    | '/oraculo'
     | '/painel'
     | '/previsao-escala'
     | '/simulador'
@@ -151,6 +155,7 @@ export interface FileRouteTypes {
     | '/capacidade'
     | '/contratacoes'
     | '/escala'
+    | '/oraculo'
     | '/painel'
     | '/previsao-escala'
     | '/simulador'
@@ -164,6 +169,7 @@ export interface RootRouteChildren {
   CapacidadeRoute: typeof CapacidadeRoute
   ContratacoesRoute: typeof ContratacoesRoute
   EscalaRoute: typeof EscalaRoute
+  OraculoRoute: typeof OraculoRoute
   PainelRoute: typeof PainelRoute
   PrevisaoEscalaRoute: typeof PrevisaoEscalaRoute
   SimuladorRoute: typeof SimuladorRoute
@@ -208,6 +214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PainelRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oraculo': {
+      id: '/oraculo'
+      path: '/oraculo'
+      fullPath: '/oraculo'
+      preLoaderRoute: typeof OraculoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/escala': {
       id: '/escala'
       path: '/escala'
@@ -236,13 +249,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CalculadoraAnualRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/oraculo': {
-      id: '/oraculo'
-      path: '/oraculo'
-      fullPath: '/oraculo'
-      preLoaderRoute: typeof OraculoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -255,11 +261,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  OraculoRoute: OraculoRoute,
   CalculadoraAnualRoute: CalculadoraAnualRoute,
   CapacidadeRoute: CapacidadeRoute,
   ContratacoesRoute: ContratacoesRoute,
   EscalaRoute: EscalaRoute,
+  OraculoRoute: OraculoRoute,
   PainelRoute: PainelRoute,
   PrevisaoEscalaRoute: PrevisaoEscalaRoute,
   SimuladorRoute: SimuladorRoute,
