@@ -9,6 +9,7 @@ import {
   CalendarCheck,
   CalendarRange,
   FlaskConical,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
   X,
@@ -16,6 +17,7 @@ import {
 
 export const NAVIGATION_ITEMS = [
   { to: "/painel", label: "Painel", icon: BarChart3 },
+  { to: "/oraculo", label: "Oráculo IA", icon: Sparkles },
   { to: "/escala", label: "Gestão de Escalas", icon: Calendar },
   { to: "/previsao-escala", label: "Previsão da Escala", icon: CalendarCheck },
   { to: "/capacidade", label: "Capacity por Agente", icon: Users },
@@ -69,7 +71,7 @@ export function Sidebar({
           {NAVIGATION_ITEMS.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
-              to={to}
+              to={to as any}
               onClick={() => isMobileOpen && onCloseMobile()}
               activeProps={{ className: "bg-primary text-primary-foreground shadow-sm" }}
               activeOptions={{ exact: true }}

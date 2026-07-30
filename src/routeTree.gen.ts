@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OraculoRouteImport } from './routes/oraculo'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as WebchatRouteImport } from './routes/webchat'
 import { Route as SimuladorRouteImport } from './routes/simulador'
@@ -19,6 +20,12 @@ import { Route as ContratacoesRouteImport } from './routes/contratacoes'
 import { Route as CapacidadeRouteImport } from './routes/capacidade'
 import { Route as CalculadoraAnualRouteImport } from './routes/calculadora-anual'
 import { Route as IndexRouteImport } from './routes/index'
+
+const OraculoRoute = OraculoRouteImport.update({
+  id: '/oraculo',
+  path: '/oraculo',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/oraculo.lazy').then((d) => d.Route))
 
 const WhatsappRoute = WhatsappRouteImport.update({
   id: '/whatsapp',
@@ -229,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CalculadoraAnualRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oraculo': {
+      id: '/oraculo'
+      path: '/oraculo'
+      fullPath: '/oraculo'
+      preLoaderRoute: typeof OraculoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -241,6 +255,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  OraculoRoute: OraculoRoute,
   CalculadoraAnualRoute: CalculadoraAnualRoute,
   CapacidadeRoute: CapacidadeRoute,
   ContratacoesRoute: ContratacoesRoute,

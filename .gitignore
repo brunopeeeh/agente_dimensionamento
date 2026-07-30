@@ -67,5 +67,8 @@ README_MIGRATIONS.md
 .agents/
 .gemini/
 graphify-out/
-.graphifyignore
+# Python
+__pycache__/
+*.pyc
+.impeccable/
 
