@@ -4,7 +4,6 @@ import { Outlet, createRootRouteWithContext, HeadContent, Scripts } from "@tanst
 import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteNav } from "@/components/SiteNav";
 import { Sidebar } from "@/components/Sidebar";
 import { OraculoWidget } from "@/components/oraculo/OraculoWidget";
@@ -41,7 +40,7 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    console.error("Erro capturado:", error);
   }, [error]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
