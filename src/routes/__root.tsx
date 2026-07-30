@@ -7,6 +7,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteNav } from "@/components/SiteNav";
 import { Sidebar } from "@/components/Sidebar";
+import { OraculoWidget } from "@/components/oraculo/OraculoWidget";
 import { DimensionamentoProvider, useDimensionamento } from "../context/DimensionamentoContext";
 import { Toaster } from "@/components/ui/sonner";
 import {
@@ -138,6 +139,7 @@ function RootLayoutContent() {
     <div className="flex flex-col min-h-screen bg-background relative">
       <SiteNav onOpenMobile={() => setIsMobileOpen(true)} />
       <Toaster />
+      <OraculoWidget />
 
       <Dialog open={isResetConfirmOpen} onOpenChange={setIsResetConfirmOpen}>
         <DialogContent className="max-w-md border-border bg-card p-6 shadow-2xl rounded-xl animate-in zoom-in-95 duration-200">
